@@ -98,13 +98,13 @@ class Driver:
             # do db commit and release the connection if pooling is enabled.
             ctx.db.commit()
             if unload and self.has_pooling:
-                _unload_context(self._ctx)
+                _unload_context(ctx)
 
         def rollback():
             # do db rollback and release the connection if pooling is enabled.
             ctx.db.rollback()
             if self.has_pooling:
-                _unload_context(self._ctx)
+                _unload_context(ctx)
 
         ctx.commit = commit
         ctx.rollback = rollback
