@@ -224,7 +224,7 @@ class Driver:
                         if _test:
                             return sql
                         return self.execute(sql)
-                    except TypeError:
+                    except (TypeError, KeyError):
                         raise ValueError('object structure format error')
                 else:
                     if self.insert(table, _last, _test=_test, **rows[0]) != -1:
