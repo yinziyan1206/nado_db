@@ -2,5 +2,4 @@
 /log/*
 /dist/*
 /venv/*
-/.idea/
 /test/
