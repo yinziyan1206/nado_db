@@ -4,8 +4,8 @@ __author__ = 'ziyan.yin'
 from dataclasses import is_dataclass, field, fields, dataclass, asdict
 from typing import Union
 
-from aiodriver import AsyncDriver
-from driver import Driver, _sql_params, MySQL
+from .aiodriver import AsyncDriver
+from .driver import Driver, _sql_params, MySQL
 
 
 def data_field(*, default=None, required=False, description='', length=64):

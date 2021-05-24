@@ -4,7 +4,7 @@ __author__ = 'ziyan.yin'
 import logging
 from typing import Optional, Awaitable
 
-from driver import _sql_params
+from .driver import _sql_params
 
 
 class AsyncDriver:

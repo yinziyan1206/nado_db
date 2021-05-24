@@ -5,7 +5,7 @@ import datetime
 import decimal
 import logging
 
-from store import Store
+from .store import Store
 
 try:
     import dbutils
