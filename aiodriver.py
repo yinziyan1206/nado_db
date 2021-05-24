@@ -109,7 +109,7 @@ class AsyncDriver:
         async with await self.cursor as cursor:
             await self.execute(sql, params, cursor)
 
-            rows = [x for x in cursor.fetchall()]
+            rows = [x for x in await cursor.fetchall()]
             await self.commit(unload=True)
 
             if cursor.description:
