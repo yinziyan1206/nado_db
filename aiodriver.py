@@ -4,7 +4,7 @@ __author__ = 'ziyan.yin'
 import logging
 from typing import Optional, Awaitable
 
-from .driver import _sql_params
+from .driver import sql_params
 
 
 class AsyncDriver:
@@ -86,7 +86,7 @@ class AsyncDriver:
     async def execute(self, sql: str, params=None, cursor=None) -> int:
         if params is None:
             params = []
-        sql = _sql_params(sql, *params)
+        sql = sql_params(sql, *params)
         try:
             if cursor:
                 return await cursor.execute(sql)
@@ -104,7 +104,7 @@ class AsyncDriver:
         if params is None:
             params = []
         if _test:
-            return _sql_params(sql, *params)
+            return sql_params(sql, *params)
 
         async with await self.cursor as cursor:
             await self.execute(sql, params, cursor)
@@ -178,7 +178,7 @@ class AsyncDriver:
             return f'`{v}`'
 
         def value_format(*args):
-            return f"({_sql_params(','.join(['%s'] * len(args)), *args)})"
+            return f"({sql_params(','.join(['%s'] * len(args)), *args)})"
 
         if rows and len(rows) > 0:
             if len(rows) > 0:
