@@ -1,11 +1,11 @@
 #!/usr/bin/python3
 __author__ = 'ziyan.yin'
 
-from dataclasses import is_dataclass, field, fields, dataclass, asdict
+from dataclasses import is_dataclass, field, fields, asdict
 from typing import Union
 
 from .aiodriver import AsyncDriver
-from .driver import Driver, _sql_params, MySQL
+from .driver import Driver, sql_params
 
 
 def data_field(*, default=None, required=False, description='', length=64):
@@ -101,7 +101,7 @@ class RepositoryFactory:
             table = obj.table
             seq = obj.primary if hasattr(obj, 'primary') else 'id'
             if key := getattr(obj, seq, None):
-                return self.db.delete(table, _test=_test, where=_sql_params(f"{seq} = %s", key))
+                return self.db.delete(table, _test=_test, where=sql_params(f"{seq} = %s", key))
             else:
                 raise ValueError('data obj has no sequence')
         return 0
@@ -113,7 +113,7 @@ class RepositoryFactory:
             params = [x['name'] for x in properties(obj)]
             if key := getattr(obj, seq, None):
                 return self.db.query(
-                    f"select {','.join(params)} from {table} where {_sql_params(f'{seq} = %s', key)}",
+                    f"select {','.join(params)} from {table} where {sql_params(f'{seq} = %s', key)}",
                     _test=_test
                 )
             else:

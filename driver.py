@@ -16,7 +16,7 @@ except ImportError:
     has_pooling = False
 
 
-def _sql_params(sql, *args):
+def sql_params(sql, *args):
     params = list()
     for p in args:
         if p is None:
@@ -124,7 +124,7 @@ class Driver:
     def execute(self, sql: str, params=None) -> int:
         if params is None:
             params = []
-        sql = _sql_params(sql, *params)
+        sql = sql_params(sql, *params)
         try:
             return self.cursor.execute(sql)
         except Exception:
@@ -135,7 +135,7 @@ class Driver:
         if params is None:
             params = []
         if _test:
-            return _sql_params(sql, *params)
+            return sql_params(sql, *params)
         self.execute(sql, params)
 
         rows = [x for x in self.cursor.fetchall()]
@@ -212,7 +212,7 @@ class Driver:
             return f'`{v}`'
 
         def value_format(*args):
-            return f"({_sql_params(','.join(['%s'] * len(args)), *args)})"
+            return f"({sql_params(','.join(['%s'] * len(args)), *args)})"
 
         if rows and len(rows) > 0:
             with self.transaction():
@@ -271,7 +271,7 @@ class Transaction:
                 self.ctx = ctx
 
             def query(self, q):
-                self.ctx.execute(_sql_params(q, transaction_count))
+                self.ctx.execute(sql_params(q, transaction_count))
 
             def transact(self):
                 self.query('SAVEPOINT NADO_%s')
