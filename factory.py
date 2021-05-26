@@ -101,7 +101,7 @@ class RepositoryFactory:
             table = obj.table
             seq = obj.primary if hasattr(obj, 'primary') else 'id'
             if key := getattr(obj, seq, None):
-                return self.db.delete(table, _test=_test, where=sql_params(f"{seq} = %s", key))
+                return self.db.delete(table, _test=_test, where=sql_params(f"{seq} = {{}}", key))
             else:
                 raise ValueError('data obj has no sequence')
         return 0
@@ -113,7 +113,7 @@ class RepositoryFactory:
             params = [x['name'] for x in properties(obj)]
             if key := getattr(obj, seq, None):
                 return self.db.query(
-                    f"select {','.join(params)} from {table} where {sql_params(f'{seq} = %s', key)}",
+                    f"select {','.join(params)} from {table} where {sql_params(f'{seq} = {{}}', key)}",
                     _test=_test
                 )
             else:
