@@ -27,7 +27,7 @@ def sql_params(sql, *args):
             params.append(f"'{str(p)}'")
         else:
             params.append(f"""\'{str(p).replace("'", "''")}\'""")
-    return sql % tuple(x for x in params)
+    return sql % tuple(x for x in params) if len(params) > 0 else sql
 
 
 def get_pooled_db(engine, **keywords):
