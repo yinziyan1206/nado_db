@@ -133,7 +133,7 @@ class AsyncDriver:
         columns = [x for x in values.keys()]
         if len(columns) > 0:
             sql = f"insert into {table} ({','.join([column_format(x) for x in columns])}) " \
-                  f"values ({','.join(['%s'] * len(columns))}) {_last}"
+                  f"values ({','.join(['{}'] * len(columns))}) {_last}"
 
             if _seq is not None:
                 sql = self._process_insert_query(sql, table, _seq)
@@ -157,7 +157,7 @@ class AsyncDriver:
             return -1
 
     async def update(self, table: str, where: str = '', _test=False, **values):
-        columns = [f'{k} = %s' for k in values.keys()]
+        columns = [f'{k} = {{}}' for k in values.keys()]
         if len(columns) > 0:
             sql = f"update {table} set {','.join(columns)} where {where if where else '1=1'}"
             if _test:
@@ -178,7 +178,7 @@ class AsyncDriver:
             return f'`{v}`'
 
         def value_format(*args):
-            return f"({sql_params(','.join(['%s'] * len(args)), *args)})"
+            return f"({sql_params(','.join(['{}'] * len(args)), *args)})"
 
         if rows and len(rows) > 0:
             if len(rows) > 0:
@@ -197,7 +197,7 @@ class AsyncDriver:
             return 0
 
     def _process_insert_query(self, sql, seq_name, table_name):
-        return sql + ";SELECT MAX(%s) FROM %s" % (seq_name, table_name)
+        return sql + ";SELECT MAX({}) FROM {}".format(seq_name, table_name)
 
 
 try:

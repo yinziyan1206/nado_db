@@ -27,7 +27,7 @@ def sql_params(sql, *args):
             params.append(f"'{str(p)}'")
         else:
             params.append(f"""\'{str(p).replace("'", "''")}\'""")
-    return sql % tuple(x for x in params) if len(params) > 0 else sql
+    return sql.format(*params) if len(params) > 0 else sql
 
 
 def get_pooled_db(engine, **keywords):
@@ -167,7 +167,7 @@ class Driver:
         columns = [x for x in values.keys()]
         if len(columns) > 0:
             sql = f"insert into {table} ({','.join([column_format(x) for x in columns])}) " \
-                  f"values ({','.join(['%s'] * len(columns))}) {_last}"
+                  f"values ({','.join(['{}'] * len(columns))}) {_last}"
             if _seq is not None:
                 sql = self._process_insert_query(sql, table, _seq)
 
@@ -189,7 +189,7 @@ class Driver:
             return -1
 
     def update(self, table: str, where: str = '', _test=False, **values):
-        columns = [f'{k} = %s' for k in values.keys()]
+        columns = [f'{k} = {{}}' for k in values.keys()]
         if len(columns) > 0:
             sql = f"update {table} set {','.join(columns)} where {where if where else '1=1'}"
             if _test:
@@ -212,7 +212,7 @@ class Driver:
             return f'`{v}`'
 
         def value_format(*args):
-            return f"({sql_params(','.join(['%s'] * len(args)), *args)})"
+            return f"({sql_params(','.join(['{}'] * len(args)), *args)})"
 
         if rows and len(rows) > 0:
             with self.transaction():
@@ -239,7 +239,7 @@ class Driver:
         return Transaction(self.ctx)
 
     def _process_insert_query(self, sql, seq_name, table_name):
-        return sql + ";SELECT MAX(%s) FROM %s" % (seq_name, table_name)
+        return sql + ";SELECT MAX({}) FROM {}".format(seq_name, table_name)
 
 
 class Transaction:
@@ -274,13 +274,13 @@ class Transaction:
                 self.ctx.execute(sql_params(q, transaction_count))
 
             def transact(self):
-                self.query('SAVEPOINT NADO_%s')
+                self.query('SAVEPOINT NADO_{}')
 
             def commit(self):
-                self.query('RELEASE SAVEPOINT NADO_%s')
+                self.query('RELEASE SAVEPOINT NADO_{}')
 
             def rollback(self):
-                self.query('ROLLBACK TO SAVEPOINT NADO_%s')
+                self.query('ROLLBACK TO SAVEPOINT NADO_{}')
 
         class dummy_engine:
             """Transaction Engine used instead of subtransaction_engine
@@ -392,7 +392,7 @@ try:
                     seq_name = None
 
             if seq_name:
-                sql += "; SELECT currval('%s')" % seq_name
+                sql += "; SELECT currval('{}')".format(seq_name)
 
             return sql
 
