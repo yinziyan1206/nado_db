@@ -138,7 +138,10 @@ class Driver:
             return sql_params(sql, *params)
         self.execute(sql, params)
 
-        rows = [x for x in self.cursor.fetchall()]
+        if res := self.cursor.fetchall():
+            rows = [x for x in res]
+        else:
+            rows = []
         if self.cursor.description:
             json_row = []
             if not rows:
@@ -227,10 +230,7 @@ class Driver:
                     except (TypeError, KeyError):
                         raise ValueError('object structure format error')
                 else:
-                    if self.insert(table, _last, _test=_test, **rows[0]) != -1:
-                        return 1
-                    else:
-                        return 0
+                    return self.insert(table, _last, _test=_test, **rows[0])
         else:
             return 0
 
