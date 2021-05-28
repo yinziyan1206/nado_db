@@ -1,4 +1,5 @@
 aiomysql
 pymysql
+aiopg
 psycopg2
 dbutils

@@ -218,6 +218,36 @@ try:
 
         def _process_insert_query(self, query, seq_name, table_name):
             return query, 'SELECT last_insert_id();'
-
 except ImportError:
     aiomysql = AioMySQL = None
+
+try:
+    import aiopg
+
+    class AioPostgreSQL(AsyncDriver):
+
+        def create_pool(self, **kwargs):
+            dsn = "dbname={0} user={1} password={2} host={3} port={4}".format(
+                kwargs['database'], kwargs['user'], kwargs['password'], kwargs['host'], kwargs['port']
+            )
+            return aiopg.create_pool(dsn)
+
+        def _process_insert_query(self, sql, seq_name, table_name):
+            if seq_name is None:
+                seq_name = seq_name + "_id_seq"
+                if seq_name not in self._get_all_sequences():
+                    seq_name = None
+
+            if seq_name:
+                sql += "; SELECT currval('{}')".format(seq_name)
+
+            return sql
+
+        def _get_all_sequences(self):
+            if self._sequences is None:
+                q = "SELECT c.relname FROM pg_class c WHERE c.relkind = 'S'"
+                self._sequences = set([c['relname'] for c in self.query(q)])
+            return self._sequences
+
+except ImportError:
+    aiopg = AioPostgreSQL = None
