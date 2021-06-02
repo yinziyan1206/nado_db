@@ -121,10 +121,17 @@ class Driver:
             self._cursor = self.ctx.db.cursor()
         return self._cursor
 
-    def execute(self, sql: str, params=None) -> int:
+    def execute(self, sql: str, params=None, transaction=None) -> int:
         if params is None:
             params = []
         sql = sql_params(sql, *params)
+        if transaction:
+            return self._execute(sql)
+        else:
+            with self.transaction():
+                return self._execute(sql)
+
+    def _execute(self, sql):
         try:
             return self.cursor.execute(sql)
         except Exception:
@@ -176,13 +183,13 @@ class Driver:
 
             if _test:
                 return sql
-            with self.transaction():
-                if isinstance(sql, tuple):
-                    q1, q2 = sql
-                    self.execute(q1, [values[x] for x in columns])
-                    self.execute(q2)
-                else:
-                    self.execute(sql, [values[x] for x in columns])
+            if isinstance(sql, tuple):
+                q1, q2 = sql
+                self.execute(q1, [values[x] for x in columns])
+                self.execute(q2)
+            else:
+                self.execute(sql, [values[x] for x in columns])
+
             try:
                 out = self.cursor.fetchone()[0]
             except TypeError:
@@ -197,8 +204,7 @@ class Driver:
             sql = f"update {table} set {','.join(columns)} where {where if where else '1=1'}"
             if _test:
                 return sql
-            with self.transaction():
-                return self.execute(sql, [values[k] for k in values.keys()])
+            return self.execute(sql, [values[k] for k in values.keys()])
         else:
             return 0
 
@@ -206,8 +212,7 @@ class Driver:
         sql = f"delete from {table} where {where if where else '1=1'}"
         if _test:
             return sql
-        with self.transaction():
-            return self.execute(sql)
+        return self.execute(sql)
 
     def insert_many(self, table: str, _last: str = '', _test=False, rows: list = None):
 
@@ -218,19 +223,18 @@ class Driver:
             return f"({sql_params(','.join(['{}'] * len(args)), *args)})"
 
         if rows and len(rows) > 0:
-            with self.transaction():
-                if len(rows) > 0:
-                    try:
-                        columns = [x for x in rows[0].keys()]
-                        sql = f"insert into {table} ({','.join([column_format(x) for x in columns])}) values " \
-                              f"{','.join([value_format(*[r[x] for x in columns]) for r in rows])} {_last}"
-                        if _test:
-                            return sql
-                        return self.execute(sql)
-                    except (TypeError, KeyError):
-                        raise ValueError('object structure format error')
-                else:
-                    return self.insert(table, _last, _test=_test, **rows[0])
+            if len(rows) > 0:
+                try:
+                    columns = [x for x in rows[0].keys()]
+                    sql = f"insert into {table} ({','.join([column_format(x) for x in columns])}) values " \
+                          f"{','.join([value_format(*[r[x] for x in columns]) for r in rows])} {_last}"
+                    if _test:
+                        return sql
+                    return self.execute(sql)
+                except (TypeError, KeyError):
+                    raise ValueError('object structure format error')
+            else:
+                return self.insert(table, _last, _test=_test, **rows[0])
         else:
             return 0
 
