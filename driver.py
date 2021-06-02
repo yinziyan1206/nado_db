@@ -391,7 +391,9 @@ try:
                     password=keywords['password'],
                     database=keywords['database']
                 )
-            return self._pool.connection()
+            conn = self._pool.connection()
+            conn._con._con.set_client_encoding(keywords['charset'])
+            return conn
 
         def _process_insert_query(self, sql, seq_name, table_name):
             if seq_name is None:
