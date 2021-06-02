@@ -128,8 +128,12 @@ class Driver:
         if transaction:
             return self._execute(sql)
         else:
-            with self.transaction():
-                return self._execute(sql)
+            try:
+                res = self._execute(sql)
+                self.ctx.commit()
+                return res
+            except Exception:
+                self.ctx.rollback()
 
     def _execute(self, sql):
         try:
