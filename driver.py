@@ -4,12 +4,14 @@ __author__ = 'ziyan.yin'
 import datetime
 import decimal
 import logging
+from typing import List, Any
 
 from .store import Store
 
 try:
     import dbutils
     from dbutils import pooled_db
+
     has_pooling = True
 except ImportError:
     pooled_db = None
@@ -44,14 +46,14 @@ def _unload_context(ctx):
 class Driver:
 
     def __init__(
-            self,
-            host: str = None,
-            port: int = None,
-            user: str = None,
-            password: str = None,
-            database: str = None,
-            charset: str = 'utf8',
-            **kwargs
+        self,
+        host: str = None,
+        port: int = None,
+        user: str = None,
+        password: str = None,
+        database: str = None,
+        charset: str = 'utf8',
+        **kwargs
     ):
         self._ctx = Store()
         self._cursor = None
@@ -415,7 +417,6 @@ try:
 except ImportError:
     psycopg2 = PostgreSQL = None
 
-
 try:
     import pymssql
 
@@ -442,3 +443,158 @@ try:
 
 except ImportError:
     pymssql = SqlServer = None
+
+
+class NoSqlDriver:
+
+    def __init__(
+        self,
+        host: str = None,
+        port: int = None,
+        user: str = None,
+        password: str = None,
+        database: str = None,
+        charset: str = 'utf8',
+        **kwargs
+    ):
+        self.config = {
+            'host': host,
+            'port': port,
+            'user': user,
+            'password': password,
+            'database': database,
+            'charset': charset
+        }
+        self.config.update(kwargs)
+        self._client = None
+        self.database = None
+        self.logger = logging.getLogger('db')
+
+    def _connect(self, **keywords):
+        raise NotImplementedError()
+
+    def collection(self, collection):
+        return self.database.get(collection, default=None)
+
+    def insert(self, collection, **value):
+        collect = self.collection(collection)
+        return collect.insert_one(value)
+
+    def insert_many(self, collection, rows: List[dict] = None):
+        collect = self.collection(collection)
+        return collect.insert_many(rows)
+
+    def delete_one(self, collection, **conditions):
+        collect = self.collection(collection)
+        return collect.delete_one(conditions)
+
+    def delete(self, collection, **conditions):
+        collect = self.collection(collection)
+        return collect.delete_many(conditions)
+
+    def find(self, collection, params: list = None, ignore: list = None, **conditions):
+        collect = self.collection(collection)
+        column = dict()
+        if params and len(params) > 0:
+            column |= {k: 1 for k in params}
+        if ignore and len(ignore) > 0:
+            column |= {k: 0 for k in ignore}
+        return collect.find(conditions, column if column else None)
+
+    def find_one(self, collection, params: list = None, ignore: list = None, **conditions):
+        return self.find(collection, params, ignore, **conditions).limit(1)
+
+    def update(self, collection, values, **conditions):
+        collect = self.collection(collection)
+        return collect.update_many(conditions, values)
+
+    def update_one(self, collection, values, **conditions):
+        collect = self.collection(collection)
+        return collect.update_one(conditions, values)
+
+
+try:
+    import pymongo
+
+    class MongoDB(NoSqlDriver):
+
+        def _connect(self, **keywords):
+            self._client = pymongo.MongoClient(keywords['host'], keywords['port'])
+            self.database = self._client.get(keywords['database'], default=None)
+            if keywords['user'] and keywords['password']:
+                self.database.authenticate(keywords['user'], keywords['password'])
+
+        def update(self, collection, values: dict = None, **conditions):
+            values = {
+                "$set": values
+            }
+            return super().update(collection, values, **conditions)
+
+        def update_one(self, collection, values: dict = None, **conditions):
+            values = {
+                "$set": values
+            }
+            return super().update_one(collection, values, **conditions)
+
+        def increase(self, collection, rank: int = 0, **conditions):
+            values = {
+                "$inc": rank
+            }
+            return super().update(collection, values, **conditions)
+
+        def increase_one(self, collection, rank: int = 0, **conditions):
+            values = {
+                "$inc": rank
+            }
+            return super().update_one(collection, values, **conditions)
+
+        def push(self, collection, column: str, value: Any, **conditions):
+            if not column:
+                return None
+            values = {
+                "$push": {column: value}
+            }
+            return super().update(collection, values, **conditions)
+
+        def push_one(self, collection, column: str, value: Any, **conditions):
+            if not column:
+                return None
+            values = {
+                "$push": {column: value}
+            }
+            return super().update_one(collection, values, **conditions)
+
+        def pull(self, collection, column: str, value: Any, **conditions):
+            if not column:
+                return None
+            values = {
+                "$pull": {column: value}
+            }
+            return super().update(collection, values, **conditions)
+
+        def pull_one(self, collection, column: str, value: Any, **conditions):
+            if not column:
+                return None
+            values = {
+                "$pull": {column: value}
+            }
+            return super().update_one(collection, values, **conditions)
+
+        def save(self, collection, **values):
+            collect = self.collection(collection)
+            return collect.save(values)
+
+        def modify(self, collection, operate, data, **conditions):
+            values = {
+                f"${operate}": data
+            }
+            return super().update(collection, values, **conditions)
+
+        def modify_one(self, collection, operate, data, **conditions):
+            values = {
+                f"${operate}": data
+            }
+            return super().update_one(collection, values, **conditions)
+
+except ImportError:
+    pymongo = MongoDB = None
