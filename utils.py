@@ -30,7 +30,9 @@ class QueryWrapper:
                 value = f'{value.replace("%", "[%]").replace("_", "[_]")}%'
                 op = 'like'
 
-        if type(value) in (int, float, decimal.Decimal):
+        if value is None:
+            self._condition.append(f"{column_name} is NULL")
+        elif type(value) in (int, float, decimal.Decimal):
             self._condition.append(f"{column_name} {op} {value}")
         elif issubclass(value.__class__, Enum):
             self._condition.append(f"{column_name} {op} {value._value_}")

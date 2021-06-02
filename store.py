@@ -33,6 +33,7 @@ class Store(local):
     def __hash__(self):
         return id(self)
 
+    @staticmethod
     def clear_all():
         """Clears all ThreadedDict instances.
         """

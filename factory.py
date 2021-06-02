@@ -54,7 +54,8 @@ def properties(cls):
 
 class RepositoryFactory:
 
-    db: Union[Driver, AsyncDriver] = None
+    def __init__(self, driver: Union[Driver, AsyncDriver]):
+        self.db = driver
 
     def save(self, obj, _test=False):
         if self.check(obj):
