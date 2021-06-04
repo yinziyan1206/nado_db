@@ -3,6 +3,6 @@ from .driver import MySQL, PostgreSQL, SqlServer, MongoDB
 from .aiodriver import AioMySQL, AioPostgreSQL
 from .utils import QueryWrapper
 __author__ = 'ziyan.yin'
-__version__ = '1.0.6'
+__version__ = '1.0.5'
 
 __all__ = ['MySQL', 'PostgreSQL', 'SqlServer', 'QueryWrapper', 'AioMySQL', 'AioPostgreSQL', 'MongoDB']
