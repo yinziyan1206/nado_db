@@ -150,10 +150,12 @@ class Driver:
         if _test:
             return sql_params(sql, *params)
         self.execute(sql, params)
-
-        if res := self.cursor.fetchall():
-            rows = [x for x in res]
-        else:
+        try:
+            if res := self.cursor.fetchall():
+                rows = [x for x in res]
+            else:
+                rows = []
+        except Exception:
             rows = []
         if self.cursor.description:
             json_row = []
