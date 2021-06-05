@@ -136,6 +136,7 @@ class Driver:
                 return res
             except Exception:
                 self.ctx.rollback()
+                raise
 
     def _execute(self, sql):
         try:
