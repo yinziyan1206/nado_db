@@ -184,12 +184,9 @@ class Driver:
         )
 
     def insert(self, table: str, _last: str = '', _seq: str = None, _test=False, **values):
-        def column_format(v):
-            return f'`{v}`'
-
         columns = [x for x in values.keys()]
         if len(columns) > 0:
-            sql = f"insert into {table} ({','.join([column_format(x) for x in columns])}) " \
+            sql = f"insert into {table} ({','.join([self.column_format(x) for x in columns])}) " \
                   f"values ({','.join(['{}'] * len(columns))}) {_last}"
             if _seq is not None:
                 sql = self._process_insert_query(sql, table, _seq)
@@ -238,9 +235,6 @@ class Driver:
 
     def insert_many(self, table: str, _last: str = '', _test=False, rows: list = None):
 
-        def column_format(v):
-            return f'`{v}`'
-
         def value_format(*args):
             return f"({sql_params(','.join(['{}'] * len(args)), *args)})"
 
@@ -248,7 +242,7 @@ class Driver:
             if len(rows) > 0:
                 try:
                     columns = [x for x in rows[0].keys()]
-                    sql = f"insert into {table} ({','.join([column_format(x) for x in columns])}) values " \
+                    sql = f"insert into {table} ({','.join([self.column_format(x) for x in columns])}) values " \
                           f"{','.join([value_format(*[r[x] for x in columns]) for r in rows])} {_last}"
                     if _test:
                         return sql
@@ -269,6 +263,10 @@ class Driver:
 
     def _process_insert_query(self, sql, seq_name, table_name):
         return sql + ";SELECT MAX({}) FROM {}".format(seq_name, table_name)
+
+    @staticmethod
+    def column_format(v):
+        return f'`{v}`'
 
 
 class Transaction:
@@ -433,6 +431,9 @@ try:
                 self._sequences = set([c['relname'] for c in self.query(q)])
             return self._sequences
 
+        @staticmethod
+        def column_format(v):
+            return f'"{v}"'
 
 except ImportError:
     psycopg2 = PostgreSQL = None
