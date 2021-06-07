@@ -64,7 +64,8 @@ class Driver:
             'password': password,
             'database': database,
             'charset': charset,
-            'ignore_nested_transactions': True
+            'ignore_nested_transactions': True,
+            'printing': kwargs['printing'] if 'printing' in kwargs else False
         }
         self.config.update(kwargs)
         self.module = None
@@ -123,20 +124,25 @@ class Driver:
             self._cursor = self.ctx.db.cursor()
         return self._cursor
 
-    def execute(self, sql: str, params=None, transaction=None) -> int:
+    def execute(self, sql: str, params=None) -> int:
+        self.ctx.db_count += 1
         if params is None:
             params = []
         sql = sql_params(sql, *params)
-        if transaction:
-            return self._execute(sql)
-        else:
-            try:
-                res = self._execute(sql)
+        try:
+            res = self._execute(sql)
+            if not self.ctx.transactions:
                 self.ctx.commit()
-                return res
-            except Exception:
+            return res
+        except Exception:
+            if self.ctx.transactions:
+                self.ctx.transactions[-1].rollback()
+            else:
                 self.ctx.rollback()
-                raise
+            raise
+        finally:
+            if self.config['printing']:
+                self.logger.info('(%s): %s' % (self.ctx.db_count, str(sql)))
 
     def _execute(self, sql):
         try:
@@ -416,6 +422,7 @@ try:
                 q = "SELECT c.relname FROM pg_class c WHERE c.relkind = 'S'"
                 self._sequences = set([c['relname'] for c in self.query(q)])
             return self._sequences
+
 
 except ImportError:
     psycopg2 = PostgreSQL = None
