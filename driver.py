@@ -131,8 +131,6 @@ class Driver:
         sql = sql_params(sql, *params)
         try:
             res = self._execute(sql)
-            if not self.ctx.transactions:
-                self.ctx.commit()
             return res
         except Exception:
             if self.ctx.transactions:
@@ -209,6 +207,9 @@ class Driver:
                 out = self.cursor.fetchone()[0]
             except TypeError:
                 out = None
+
+            if not self.ctx.transactions:
+                self.ctx.commit()
             return out
         else:
             return -1
@@ -219,7 +220,10 @@ class Driver:
             sql = f"update {table} set {','.join(columns)} where {where if where else '1=1'}"
             if _test:
                 return sql
-            return self.execute(sql, [values[k] for k in values.keys()])
+            self.execute(sql, [values[k] for k in values.keys()])
+            if not self.ctx.transactions:
+                self.ctx.commit()
+            return self.cursor.rowcount
         else:
             return 0
 
@@ -227,7 +231,10 @@ class Driver:
         sql = f"delete from {table} where {where if where else '1=1'}"
         if _test:
             return sql
-        return self.execute(sql)
+        self.execute(sql)
+        if not self.ctx.transactions:
+            self.ctx.commit()
+        return self.cursor.rowcount
 
     def insert_many(self, table: str, _last: str = '', _test=False, rows: list = None):
 
@@ -245,7 +252,10 @@ class Driver:
                           f"{','.join([value_format(*[r[x] for x in columns]) for r in rows])} {_last}"
                     if _test:
                         return sql
-                    return self.execute(sql)
+                    out = self.execute(sql)
+                    if not self.ctx.transactions:
+                        self.ctx.commit()
+                    return out
                 except (TypeError, KeyError):
                     raise ValueError('object structure format error')
             else:
