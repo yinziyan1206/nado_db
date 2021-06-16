@@ -3,6 +3,7 @@ __author__ = 'ziyan.yin'
 
 import logging
 from typing import Optional, Awaitable
+from urllib import parse
 
 from .driver import sql_params
 
@@ -291,7 +292,8 @@ try:
     class AioMongoDB(AsyncNoSQLDriver):
 
         async def create_pool(self, **keywords):
-            auth = f"{keywords['user']}:{keywords['password']}@" if keywords['user'] and keywords['password'] else ''
+            auth = f"{parse.quote(keywords['user'])}:{parse.quote(keywords['password'])}@" \
+                if keywords['user'] and keywords['password'] else ''
             uri = f"mongodb://{auth}{keywords['host']}:{keywords['port']}" \
                   f"/{keywords['database']}?maxpoolsize={keywords['max_size']}"
             self._client = await aiomongo.create_client(uri)

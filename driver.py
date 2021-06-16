@@ -5,8 +5,9 @@ import datetime
 import decimal
 import logging
 from typing import List, Any
+from urllib import parse
 
-from .store import Store
+from store import Store
 
 try:
     import dbutils
@@ -541,7 +542,8 @@ try:
     class MongoDB(NoSqlDriver):
 
         def _connect(self, **keywords):
-            auth = f"{keywords['user']}:{keywords['password']}@" if keywords['user'] and keywords['password'] else ''
+            auth = f"{parse.quote(keywords['user'])}:{parse.quote(keywords['password'])}@" \
+                if keywords['user'] and keywords['password'] else ''
             host = f"mongodb://{auth}{keywords['host']}"
             self._client = pymongo.MongoClient(host, keywords['port'])
             self.database = self._client.get_database(keywords['database'])
