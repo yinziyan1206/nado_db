@@ -7,7 +7,7 @@ import logging
 from typing import List, Any
 from urllib import parse
 
-from store import Store
+from .store import Store
 
 try:
     import dbutils
