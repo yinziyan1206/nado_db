@@ -291,11 +291,11 @@ try:
     class AioMongoDB(AsyncNoSQLDriver):
 
         async def create_pool(self, **keywords):
-            self._client = await aiomongo.create_client(
-                f"mongodb://{keywords['host']}:{keywords['port']}/{keywords['database']}"
-                f"?maxpoolsize={keywords['max_size']}&"
-            )
-            self.database = self._client.get(keywords['database'], default=None)
+            auth = f"{keywords['user']}:{keywords['password']}@" if keywords['user'] and keywords['password'] else ''
+            uri = f"mongodb://{auth}{keywords['host']}:{keywords['port']}" \
+                  f"/{keywords['database']}?maxpoolsize={keywords['max_size']}"
+            self._client = await aiomongo.create_client(uri)
+            self.database = self._client.get_database(keywords['database'])
             if keywords['user'] and keywords['password']:
                 self.database.authenticate(keywords['user'], keywords['password'])
 

@@ -541,10 +541,10 @@ try:
     class MongoDB(NoSqlDriver):
 
         def _connect(self, **keywords):
-            self._client = pymongo.MongoClient(keywords['host'], keywords['port'])
-            self.database = self._client.get(keywords['database'], default=None)
-            if keywords['user'] and keywords['password']:
-                self.database.authenticate(keywords['user'], keywords['password'])
+            auth = f"{keywords['user']}:{keywords['password']}@" if keywords['user'] and keywords['password'] else ''
+            host = f"mongodb://{auth}{keywords['host']}"
+            self._client = pymongo.MongoClient(host, keywords['port'])
+            self.database = self._client.get_database(keywords['database'])
 
         def collection(self, collection):
             if res := self.database.get(collection, default=None):
