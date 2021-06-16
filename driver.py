@@ -549,7 +549,7 @@ try:
             self.database = self._client.get_database(keywords['database'])
 
         def collection(self, collection):
-            if res := self.database.get(collection, default=None):
+            if res := self.database.get_collection(collection):
                 return res
             return self.database.create_collect(collection)
 

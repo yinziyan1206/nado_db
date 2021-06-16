@@ -298,8 +298,6 @@ try:
                   f"/{keywords['database']}?maxpoolsize={keywords['max_size']}"
             self._client = await aiomongo.create_client(uri)
             self.database = self._client.get_database(keywords['database'])
-            if keywords['user'] and keywords['password']:
-                self.database.authenticate(keywords['user'], keywords['password'])
 
 except ImportError:
     aiomongo = AioMongoDB = None
