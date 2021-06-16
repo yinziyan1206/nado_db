@@ -200,6 +200,38 @@ class AsyncDriver:
         return sql + ";SELECT MAX({}) FROM {}".format(seq_name, table_name)
 
 
+class AsyncNoSQLDriver:
+    def __init__(
+            self,
+            host: str = None,
+            port: int = None,
+            user: str = None,
+            password: str = None,
+            database: str = None,
+            charset: str = 'utf8',
+            **kwargs
+    ):
+        self._pool = None
+        self._db = None
+
+        self.config = {
+            'host': host,
+            'port': port,
+            'user': user,
+            'password': password,
+            'database': database,
+            'charset': charset,
+            'max_size': kwargs['max_size'] if 'max_size' in kwargs else 10
+        }
+        self.config.update(kwargs)
+        self._client = None
+        self.database = None
+        self.logger = logging.getLogger('aio-nosql-db')
+
+    def create_pool(self, **kwargs):
+        raise NotImplementedError()
+
+
 try:
     import aiomysql
 
@@ -251,3 +283,21 @@ try:
 
 except ImportError:
     aiopg = AioPostgreSQL = None
+
+
+try:
+    import aiomongo
+
+    class AioMongoDB(AsyncNoSQLDriver):
+
+        async def create_pool(self, **keywords):
+            self._client = await aiomongo.create_client(
+                f"mongodb://{keywords['host']}:{keywords['port']}/{keywords['database']}"
+                f"?maxpoolsize={keywords['max_size']}&"
+            )
+            self.database = self._client.get(keywords['database'], default=None)
+            if keywords['user'] and keywords['password']:
+                self.database.authenticate(keywords['user'], keywords['password'])
+
+except ImportError:
+    aiomongo = AioMongoDB = None

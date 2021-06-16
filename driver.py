@@ -490,12 +490,13 @@ class NoSqlDriver:
         self._client = None
         self.database = None
         self.logger = logging.getLogger('db')
+        self._connect(**self.config)
 
     def _connect(self, **keywords):
         raise NotImplementedError()
 
     def collection(self, collection):
-        return self.database.get(collection, default=None)
+        raise NotImplementedError()
 
     def insert(self, collection, **value):
         collect = self.collection(collection)
@@ -544,6 +545,11 @@ try:
             self.database = self._client.get(keywords['database'], default=None)
             if keywords['user'] and keywords['password']:
                 self.database.authenticate(keywords['user'], keywords['password'])
+
+        def collection(self, collection):
+            if res := self.database.get(collection, default=None):
+                return res
+            return self.database.create_collect(collection)
 
         def update(self, collection, values: dict = None, **conditions):
             values = {
