@@ -111,13 +111,13 @@ class AsyncDriver:
             await self.execute(sql, params, cursor)
 
             rows = [x for x in await cursor.fetchall()]
+            description = cursor.description
             await self.commit(unload=True)
-
-            if cursor.description:
+            if description:
                 json_row = []
                 if not rows:
                     return json_row
-                cols = [x[0] for x in cursor.description]
+                cols = [x[0] for x in description]
                 for row in rows:
                     obj = {}
                     for prop, val in zip(cols, row):
@@ -128,12 +128,9 @@ class AsyncDriver:
                 return rows
 
     async def insert(self, table: str, _last: str = '', _seq: str = None, _test=False, **values):
-        def column_format(v):
-            return f'`{v}`'
-
         columns = [x for x in values.keys()]
         if len(columns) > 0:
-            sql = f"insert into {table} ({','.join([column_format(x) for x in columns])}) " \
+            sql = f"insert into {table} ({','.join([self.column_format(x) for x in columns])}) " \
                   f"values ({','.join(['{}'] * len(columns))}) {_last}"
 
             if _seq is not None:
@@ -175,9 +172,6 @@ class AsyncDriver:
 
     async def insert_many(self, table: str, _last: str = '', _test=False, rows: list = None):
 
-        def column_format(v):
-            return f'`{v}`'
-
         def value_format(*args):
             return f"({sql_params(','.join(['{}'] * len(args)), *args)})"
 
@@ -185,7 +179,7 @@ class AsyncDriver:
             if len(rows) > 0:
                 try:
                     columns = [x for x in rows[0].keys()]
-                    sql = f"insert into {table} ({','.join([column_format(x) for x in columns])}) values " \
+                    sql = f"insert into {table} ({','.join([self.column_format(x) for x in columns])}) values " \
                           f"{','.join([value_format(*[r[x] for x in columns]) for r in rows])} {_last}"
                     if _test:
                         return sql
@@ -199,6 +193,10 @@ class AsyncDriver:
 
     def _process_insert_query(self, sql, seq_name, table_name):
         return sql + ";SELECT MAX({}) FROM {}".format(seq_name, table_name)
+
+    @staticmethod
+    def column_format(v):
+        return f'`{v}`'
 
 
 class AsyncNoSQLDriver:
@@ -265,6 +263,16 @@ try:
             )
             return aiopg.create_pool(dsn)
 
+        @property
+        async def cursor(self):
+            if not self._db:
+                await self.load_context()
+            cursor = self._db.cursor()
+            await cursor.execute('BEGIN')
+            self._db.commit = cursor.execute('COMMIT')
+            self._db.rollback = cursor.execute('ROLLBACK')
+            return cursor
+
         def _process_insert_query(self, sql, seq_name, table_name):
             if seq_name is None:
                 seq_name = seq_name + "_id_seq"
@@ -281,6 +289,31 @@ try:
                 q = "SELECT c.relname FROM pg_class c WHERE c.relkind = 'S'"
                 self._sequences = set([c['relname'] for c in self.query(q)])
             return self._sequences
+
+        @property
+        async def cursor(self):
+            if not self._db:
+                await self.load_context()
+            cursor = await self._db.cursor()
+            await cursor.execute('BEGIN')
+
+            async def commit(unload=True):
+                await cursor.execute('COMMIT')
+                if unload:
+                    await self.unload_context()
+
+            async def rollback():
+                # do db rollback and release the connection if pooling is enabled.
+                await cursor.execute('ROLLBACK')
+                await self.unload_context()
+
+            self.commit = commit
+            self.rollback = rollback
+            return cursor
+
+        @staticmethod
+        def column_format(v):
+            return f'"{v}"'
 
 except ImportError:
     aiopg = AioPostgreSQL = None
