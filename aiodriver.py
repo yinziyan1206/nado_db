@@ -71,7 +71,8 @@ class AsyncDriver:
         return conn
 
     async def unload_context(self, conn):
-        await self.release(conn)
+        if not conn.closed:
+            await self.release(conn)
 
     @property
     async def cursor(self):
