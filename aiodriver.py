@@ -263,16 +263,6 @@ try:
             )
             return aiopg.create_pool(dsn)
 
-        @property
-        async def cursor(self):
-            if not self._db:
-                await self.load_context()
-            cursor = self._db.cursor()
-            await cursor.execute('BEGIN')
-            self._db.commit = cursor.execute('COMMIT')
-            self._db.rollback = cursor.execute('ROLLBACK')
-            return cursor
-
         def _process_insert_query(self, sql, seq_name, table_name):
             if seq_name is None:
                 seq_name = seq_name + "_id_seq"
