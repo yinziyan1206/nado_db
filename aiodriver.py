@@ -285,21 +285,24 @@ try:
             if not self._db:
                 await self.load_context()
             cursor = await self._db.cursor()
-            await cursor.execute('BEGIN')
+            return cursor
+
+        async def load_context(self):
+
+            if not self._db:
+                self._db = await self.acquire()
 
             async def commit(unload=True):
-                await cursor.execute('COMMIT')
+                # do db commit and release the connection if pooling is enabled.
                 if unload:
                     await self.unload_context()
 
             async def rollback():
                 # do db rollback and release the connection if pooling is enabled.
-                await cursor.execute('ROLLBACK')
                 await self.unload_context()
 
             self.commit = commit
             self.rollback = rollback
-            return cursor
 
         @staticmethod
         def column_format(v):
