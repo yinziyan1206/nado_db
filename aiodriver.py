@@ -21,7 +21,6 @@ class AsyncDriver:
             **kwargs
     ):
         self._pool = None
-        self._db = None
 
         self.config = {
             'host': host,
@@ -30,7 +29,7 @@ class AsyncDriver:
             'password': password,
             'database': database,
             'charset': charset,
-            'ignore_nested_transactions': True
+            'ignore_transactions': False
         }
         self.config.update(kwargs)
         self.commit = None
@@ -43,46 +42,41 @@ class AsyncDriver:
     async def initial(self):
         self._pool = await self.create_pool(**self.config)
 
-    def acquire(self) -> Optional[Awaitable[None]]:
+    def acquire(self):
         return self._pool.acquire()
 
-    def release(self) -> Optional[Awaitable[None]]:
-        return self._pool.release(self._db)
+    def release(self, conn):
+        return self._pool.release(conn)
 
     async def load_context(self):
-
-        if not self._db:
-            self._db = await self.acquire()
-
-        if not hasattr(self._db, 'commit'):
-            self._db.commit = lambda: None
-
-        if not hasattr(self._db, 'rollback'):
-            self._db.rollback = lambda: None
+        conn = await self.acquire()
+        if not conn:
+            raise ConnectionError('connection established error')
 
         async def commit(unload=True):
             # do db commit and release the connection if pooling is enabled.
-            await self._db.commit()
+            if hasattr(conn, 'commit') and not self.config['ignore_transactions']:
+                await conn.commit()
             if unload:
-                await self.unload_context()
+                await self.unload_context(conn)
 
         async def rollback():
             # do db rollback and release the connection if pooling is enabled.
-            await self._db.rollback()
-            await self.unload_context()
+            if hasattr(conn, 'rollback') and not self.config['ignore_transactions']:
+                await conn.rollback()
+            await self.unload_context(conn)
 
         self.commit = commit
         self.rollback = rollback
+        return conn
 
-    async def unload_context(self):
-        await self.release()
-        self._db = None
+    async def unload_context(self, conn):
+        await self.release(conn)
 
     @property
     async def cursor(self):
-        if not self._db:
-            await self.load_context()
-        return self._db.cursor()
+        conn = await self.load_context()
+        return conn.cursor()
 
     async def execute(self, sql: str, params=None, cursor=None) -> int:
         if params is None:
@@ -94,11 +88,11 @@ class AsyncDriver:
             else:
                 async with await self.cursor as cursor:
                     c = await cursor.execute(sql)
-                    await self.commit(unload=True)
+                    await self.commit()
                     return c
         except Exception:
             self.logger.error(f'ERR: {sql}')
-            await self.rollback()
+            self.rollback()
             raise
 
     async def query(self, sql: str, params=None, _test=False) -> list:
@@ -249,6 +243,7 @@ try:
 
         def _process_insert_query(self, query, seq_name, table_name):
             return query, 'SELECT last_insert_id();'
+
 except ImportError:
     aiomysql = AioMySQL = None
 
@@ -261,6 +256,7 @@ try:
             dsn = "dbname={0} user={1} password={2} host={3} port={4}".format(
                 kwargs['database'], kwargs['user'], kwargs['password'], kwargs['host'], kwargs['port']
             )
+            self.config['ignore_transactions'] = True
             return aiopg.create_pool(dsn)
 
         def _process_insert_query(self, sql, seq_name, table_name):
@@ -279,30 +275,6 @@ try:
                 q = "SELECT c.relname FROM pg_class c WHERE c.relkind = 'S'"
                 self._sequences = set([c['relname'] for c in self.query(q)])
             return self._sequences
-
-        @property
-        async def cursor(self):
-            if not self._db:
-                await self.load_context()
-            cursor = await self._db.cursor()
-            return cursor
-
-        async def load_context(self):
-
-            if not self._db:
-                self._db = await self.acquire()
-
-            async def commit(unload=True):
-                # do db commit and release the connection if pooling is enabled.
-                if unload:
-                    await self.unload_context()
-
-            async def rollback():
-                # do db rollback and release the connection if pooling is enabled.
-                await self.unload_context()
-
-            self.commit = commit
-            self.rollback = rollback
 
         @staticmethod
         def column_format(v):
