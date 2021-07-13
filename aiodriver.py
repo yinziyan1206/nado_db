@@ -93,7 +93,7 @@ class AsyncDriver:
                     return c
         except Exception:
             self.logger.error(f'ERR: {sql}')
-            self.rollback()
+            await self.rollback()
             raise
 
     async def query(self, sql: str, params=None, _test=False) -> list:
