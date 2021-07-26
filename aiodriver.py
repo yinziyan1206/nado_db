@@ -34,6 +34,7 @@ class AsyncDriver:
         self.config.update(kwargs)
         self.commit = None
         self.rollback = None
+        self.close = None
         self.logger = logging.getLogger('aio-db')
 
     def create_pool(self, **kwargs):
@@ -66,8 +67,12 @@ class AsyncDriver:
                 await conn.rollback()
             await self.unload_context(conn)
 
+        async def close():
+            await self.unload_context(conn)
+
         self.commit = commit
         self.rollback = rollback
+        self.close = close
         return conn
 
     async def unload_context(self, conn):
@@ -107,7 +112,7 @@ class AsyncDriver:
 
             rows = [x for x in await cursor.fetchall()]
             description = cursor.description
-            await self.commit(unload=True)
+            await self.close()
             if description:
                 json_row = []
                 if not rows:
