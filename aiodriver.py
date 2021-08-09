@@ -109,23 +109,23 @@ class AsyncDriver:
 
         async with await self.cursor as cursor:
             await self.execute(sql, params, cursor)
-
             rows = [x for x in await cursor.fetchall()]
             description = cursor.description
-            await self.close()
-            if description:
-                json_row = []
-                if not rows:
-                    return json_row
-                cols = [x[0] for x in description]
-                for row in rows:
-                    obj = {}
-                    for prop, val in zip(cols, row):
-                        obj[prop] = val
-                    json_row.append(obj)
+        await self.close()
+
+        if description:
+            json_row = []
+            if not rows:
                 return json_row
-            else:
-                return rows
+            cols = [x[0] for x in description]
+            for row in rows:
+                obj = {}
+                for prop, val in zip(cols, row):
+                    obj[prop] = val
+                json_row.append(obj)
+            return json_row
+        else:
+            return rows
 
     async def insert(self, table: str, _last: str = '', _seq: str = None, _test=False, **values):
         columns = [x for x in values.keys()]
