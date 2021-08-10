@@ -2,7 +2,6 @@
 __author__ = 'ziyan.yin'
 
 import logging
-from typing import Optional, Awaitable
 from urllib import parse
 
 from .driver import sql_params
@@ -67,12 +66,12 @@ class AsyncDriver:
                 await conn.rollback()
             await self.unload_context(conn)
 
-        async def close():
+        async def release():
             await self.unload_context(conn)
 
-        self.commit = commit
-        self.rollback = rollback
-        self.close = close
+        conn.commit = commit
+        conn.rollback = rollback
+        conn.release = release
         return conn
 
     async def unload_context(self, conn):
@@ -81,8 +80,32 @@ class AsyncDriver:
 
     @property
     async def cursor(self):
-        conn = await self.load_context()
-        return conn.cursor()
+        class _Cursor:
+            def __init__(self, conn):
+                self.conn = conn
+                self.transaction = conn.cursor()
+                self.is_close = False
+
+            async def execute(self, sql):
+                return await self.transaction.execute(sql)
+
+            async def __aenter__(self):
+                return await self.transaction.__aenter__()
+
+            async def __aexit__(self, exc_type, exc_val, exc_tb):
+                await self.transaction.__aexit__(exc_type, exc_val, exc_tb)
+                if not self.is_close:
+                    await self.conn.release()
+
+            async def commit(self):
+                await self.conn.commit()
+                self.is_close = True
+
+            async def rollback(self):
+                await self.conn.rollback()
+                self.is_close = True
+
+        return _Cursor(await self.load_context())
 
     async def execute(self, sql: str, params=None, cursor=None) -> int:
         if params is None:
@@ -94,11 +117,12 @@ class AsyncDriver:
             else:
                 async with await self.cursor as cursor:
                     c = await cursor.execute(sql)
-                    await self.commit()
+                    await cursor.commit()
                     return c
         except Exception:
             self.logger.error(f'ERR: {sql}')
-            await self.rollback()
+            if cursor:
+                await cursor.rollback()
             raise
 
     async def query(self, sql: str, params=None, _test=False) -> list:
@@ -111,7 +135,6 @@ class AsyncDriver:
             await self.execute(sql, params, cursor)
             rows = [x for x in await cursor.fetchall()]
             description = cursor.description
-        await self.close()
 
         if description:
             json_row = []
