@@ -50,15 +50,15 @@ class AsyncDriver:
         if not conn:
             raise ConnectionError('connection established error')
 
-        async def release():
-            await self.unload_context(conn)
+        def release():
+            self.unload_context(conn)
 
         conn.release = release
         return conn
 
-    async def unload_context(self, conn):
+    def unload_context(self, conn):
         if not conn.closed:
-            await self.release(conn)
+            self.release(conn)
 
     @property
     async def cursor(self):
@@ -67,31 +67,27 @@ class AsyncDriver:
                 self.conn = conn
                 self.ignore_transactions = ignore_transactions
                 self.transaction = conn.cursor()
-                self.is_close = False
-
-            async def execute(self, sql):
-                return await self.transaction.execute(sql)
 
             async def __aenter__(self):
                 return await self.transaction.__aenter__()
 
             async def __aexit__(self, exc_type, exc_val, exc_tb):
                 await self.transaction.__aexit__(exc_type, exc_val, exc_tb)
-                if not self.is_close:
-                    await self.conn.release()
+                if exc_type:
+                    await self.rollback()
+                else:
+                    await self.commit()
 
             async def commit(self, unload=True):
                 if hasattr(self.conn, 'commit') and not self.ignore_transactions:
                     await self.conn.commit()
                 if unload:
                     self.conn.release()
-                    self.is_close = True
 
             async def rollback(self):
                 if hasattr(self.conn, 'rollback') and not self.ignore_transactions:
                     await self.conn.rollback()
-                await self.conn.rollback()
-                self.is_close = True
+                self.conn.release()
 
         return _Cursor(await self.load_context(), self.config['ignore_transactions'])
 
@@ -104,13 +100,9 @@ class AsyncDriver:
                 return await cursor.execute(sql)
             else:
                 async with await self.cursor as cursor:
-                    c = await cursor.execute(sql)
-                    await cursor.commit()
-                    return c
+                    return await cursor.execute(sql)
         except Exception:
             self.logger.error(f'ERR: {sql}')
-            if cursor:
-                await cursor.rollback()
             raise
 
     async def query(self, sql: str, params=None, _test=False) -> list:
