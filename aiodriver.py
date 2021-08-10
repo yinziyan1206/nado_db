@@ -31,9 +31,6 @@ class AsyncDriver:
             'ignore_transactions': False
         }
         self.config.update(kwargs)
-        self.commit = None
-        self.rollback = None
-        self.close = None
         self.logger = logging.getLogger('aio-db')
 
     def create_pool(self, **kwargs):
@@ -53,24 +50,9 @@ class AsyncDriver:
         if not conn:
             raise ConnectionError('connection established error')
 
-        async def commit(unload=True):
-            # do db commit and release the connection if pooling is enabled.
-            if hasattr(conn, 'commit') and not self.config['ignore_transactions']:
-                await conn.commit()
-            if unload:
-                await self.unload_context(conn)
-
-        async def rollback():
-            # do db rollback and release the connection if pooling is enabled.
-            if hasattr(conn, 'rollback') and not self.config['ignore_transactions']:
-                await conn.rollback()
-            await self.unload_context(conn)
-
         async def release():
             await self.unload_context(conn)
 
-        conn.commit = commit
-        conn.rollback = rollback
         conn.release = release
         return conn
 
@@ -81,8 +63,9 @@ class AsyncDriver:
     @property
     async def cursor(self):
         class _Cursor:
-            def __init__(self, conn):
+            def __init__(self, conn, ignore_transactions):
                 self.conn = conn
+                self.ignore_transactions = ignore_transactions
                 self.transaction = conn.cursor()
                 self.is_close = False
 
@@ -97,15 +80,20 @@ class AsyncDriver:
                 if not self.is_close:
                     await self.conn.release()
 
-            async def commit(self):
-                await self.conn.commit()
-                self.is_close = True
+            async def commit(self, unload=True):
+                if hasattr(self.conn, 'commit') and not self.ignore_transactions:
+                    await self.conn.commit()
+                if unload:
+                    self.conn.release()
+                    self.is_close = True
 
             async def rollback(self):
+                if hasattr(self.conn, 'rollback') and not self.ignore_transactions:
+                    await self.conn.rollback()
                 await self.conn.rollback()
                 self.is_close = True
 
-        return _Cursor(await self.load_context())
+        return _Cursor(await self.load_context(), self.config['ignore_transactions'])
 
     async def execute(self, sql: str, params=None, cursor=None) -> int:
         if params is None:
