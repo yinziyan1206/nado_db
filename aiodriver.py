@@ -160,7 +160,7 @@ class AsyncDriver:
                     out = await cursor.fetchone()[0]
                 except TypeError:
                     out = None
-                await self.commit()
+                await cursor.commit()
                 return out
         else:
             return -1
