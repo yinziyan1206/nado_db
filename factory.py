@@ -57,52 +57,66 @@ class RepositoryFactory:
     def __init__(self, driver: Union[Driver, AsyncDriver]):
         self.db = driver
 
-    def save(self, obj, _test=False):
+    def save(self, obj, cursor=None, _test=False):
         if self.check(obj):
             table = obj.table
             seq = obj.primary if hasattr(obj, 'primary') else 'id'
             params = asdict(obj)
             if getattr(obj, seq, None):
                 updates = [f'{x}=values({x})' for x in params.keys() if x != seq]
-                return self.db.insert(
-                    table, _seq=seq, _test=_test,
-                    _last=f"ON DUPLICATE KEY UPDATE {','.join(updates)}",
-                    **params
-                )
+                if issubclass(self.db.__class__, AsyncDriver):
+                    return self.db.insert(
+                        table, cursor=cursor, _seq=seq, _test=_test,
+                        _last=f"ON DUPLICATE KEY UPDATE {','.join(updates)}",
+                        **params
+                    )
+                else:
+                    return self.db.insert(
+                        table, _seq=seq, _test=_test,
+                        _last=f"ON DUPLICATE KEY UPDATE {','.join(updates)}",
+                        **params
+                    )
             else:
                 return self.db.insert(table, _seq=seq, _test=_test, **params)
 
-    def save_batch(self, *args, _test=False):
-        if len(args) > 1:
-            if self.check(args[0]):
-                table = args[0].table
-                seq = args[0].primary if hasattr(args[0], 'primary') else 'id'
-                params = asdict(args[0])
-                updates = [f'{x}=values({x})' for x in params.keys() if x != seq]
-                items = []
-                for x in args:
-                    data = asdict(x)
-                    if seq in data and not data[seq]:
-                        del data[seq]
-                    items.append(data)
+    def save_batch(self, *args, cursor=None, _test=False):
+        if len(args) > 1 and self.check(args[0]):
+            table = args[0].table
+            seq = args[0].primary if hasattr(args[0], 'primary') else 'id'
+            params = asdict(args[0])
+            updates = [f'{x}=values({x})' for x in params.keys() if x != seq]
+            items = []
+            for x in args:
+                data = asdict(x)
+                if seq in data and not data[seq]:
+                    del data[seq]
+                items.append(data)
+            if issubclass(self.db.__class__, AsyncDriver):
+                return self.db.insert_many(
+                    table, cursor=cursor, _test=_test,
+                    _last=f"ON DUPLICATE KEY UPDATE {','.join(updates)}",
+                    rows=items
+                )
+            else:
                 return self.db.insert_many(
                     table, _test=_test,
                     _last=f"ON DUPLICATE KEY UPDATE {','.join(updates)}",
                     rows=items
                 )
-            else:
-                return 0
         elif len(args) == 1:
-            return self.save(args[0], _test=_test)
+            return self.save(args[0], cursor=cursor, _test=_test)
         else:
             return 0
 
-    def delete(self, obj, _test=False):
+    def delete(self, obj, cursor=None, _test=False):
         if self.check(obj):
             table = obj.table
             seq = obj.primary if hasattr(obj, 'primary') else 'id'
             if key := getattr(obj, seq, None):
-                return self.db.delete(table, _test=_test, where=sql_params(f"{seq} = {{}}", key))
+                if issubclass(self.db.__class__, AsyncDriver):
+                    return self.db.delete(table, _test=_test, cursor=cursor, where=sql_params(f"{seq} = {{}}", key))
+                else:
+                    return self.db.delete(table, _test=_test, where=sql_params(f"{seq} = {{}}", key))
             else:
                 raise ValueError('data obj has no sequence')
         return 0

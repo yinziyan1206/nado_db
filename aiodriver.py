@@ -127,19 +127,17 @@ class AsyncDriver:
             self.logger.error(f'ERR: {sql}')
             raise
 
-    async def query(self, sql: str, params=None, cursor=None, _test=False) -> list:
+    async def query(self, sql: str, params=None, _test=False) -> list:
         if params is None:
             params = []
         if _test:
             return sql_params(sql, *params)
 
-        async def _inner(transaction):
-            await self.execute(sql, params, transaction)
-            data = [x for x in await transaction.fetchall()]
-            desc = transaction.description
-            return desc, data
+        async with await self.cursor as cursor:
+            await self.execute(sql, params, cursor)
+            rows = [x for x in await cursor.fetchall()]
+            description = cursor.description
 
-        description, rows = await self.__cursor_wrapper(cursor, _inner)
         if description:
             json_row = []
             if not rows:
