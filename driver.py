@@ -26,7 +26,7 @@ def sql_params(sql, *args):
             params.append('NULL')
         elif type(p) in (int, float, decimal.Decimal):
             params.append(str(p))
-        elif type(p) is datetime.datetime:
+        elif type(p) in (datetime.datetime, datetime.date):
             params.append(f"'{str(p)}'")
         else:
             params.append(f"""\'{str(p).replace("'", "''")}\'""")
