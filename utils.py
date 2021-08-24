@@ -18,7 +18,8 @@ class QueryWrapper:
         self._order: list = []
         self._last: str = ""
 
-    def _base_op(self, column_name, value, op) -> None:
+    @staticmethod
+    def like_filter(value, op):
         if op.startswith('like'):
             value = str(value).replace("'", "''")
             if op == 'like':
@@ -29,7 +30,10 @@ class QueryWrapper:
             elif op == 'like_right':
                 value = f'{value.replace("%", "[%]").replace("_", "[_]")}%'
                 op = 'like'
+        return value, op
 
+    def _base_op(self, column_name, value, op) -> None:
+        value, op = self.like_filter(value, op)
         if value is None:
             self._condition.append(f"{column_name} is NULL")
         elif type(value) in (int, float, decimal.Decimal):
