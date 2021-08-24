@@ -172,7 +172,7 @@ class AsyncDriver:
                 else:
                     await self.execute(sql, [values[x] for x in columns], cursor=transaction)
                 try:
-                    out = await transaction.fetchone()[0]
+                    out = (await transaction.fetchone())[0]
                 except TypeError:
                     out = None
                 return out
