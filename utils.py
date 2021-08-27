@@ -87,8 +87,27 @@ class QueryWrapper:
     def like_right(self, column_name, value) -> None:
         self._base_op(column_name, value, 'like_right')
 
+    def include(self, column_name, *values) -> None:
+        format_value = []
+        for v in values:
+            if v is None:
+                format_value.append('NULL')
+            elif type(v) in (int, float, decimal.Decimal):
+                format_value.append(v)
+            elif issubclass(v.__class__, Enum):
+                format_value.append(v._value_)
+            elif isinstance(v, datetime.datetime):
+                format_value.append(v.strftime('%Y-%m-%d %H:%M:%S'))
+            else:
+                format_value.append(str(v).replace("'", "''"))
+
+        self._condition.append(f"{column_name} in ({','.join(format_value)})")
+
     def last(self, sql) -> None:
         self._last = sql
+
+    def add_order(self, order, asc=True):
+        self._order.append(f'{order} {"asc" if asc else "desc"}')
 
     @property
     def order(self) -> str:
