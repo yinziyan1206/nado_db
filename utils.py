@@ -53,7 +53,7 @@ class QueryWrapper:
             if op in ('>', '>='):
                 self._condition.append(f"{column_name} {op} '{value} 00:00:00.000000'")
             elif op in ('<', '<='):
-                self._condition.append(f"{column_name} {op} '{value} 00:00:00.999999'")
+                self._condition.append(f"{column_name} {op} '{value} 23:59:59.999999'")
             else:
                 self._condition.append(f"{column_name} {op} '{value}'")
         else:
