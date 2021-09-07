@@ -93,7 +93,7 @@ class QueryWrapper:
             if v is None:
                 format_value.append('NULL')
             elif type(v) in (int, float, decimal.Decimal):
-                format_value.append(v)
+                format_value.append(str(v))
             elif issubclass(v.__class__, Enum):
                 format_value.append(v._value_)
             elif isinstance(v, datetime.datetime):
