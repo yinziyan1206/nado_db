@@ -95,7 +95,7 @@ class QueryWrapper:
             elif type(v) in (int, float, decimal.Decimal):
                 format_value.append(str(v))
             elif issubclass(v.__class__, Enum):
-                format_value.append(v._value_)
+                format_value.append(str(v.value))
             elif isinstance(v, datetime.datetime):
                 format_value.append(v.strftime('%Y-%m-%d %H:%M:%S'))
             else:
