@@ -89,17 +89,18 @@ class QueryWrapper:
 
     def include(self, column_name, *values) -> None:
         format_value = []
+        value_wrapper = "'{0}'"
         for v in values:
             if v is None:
                 format_value.append('NULL')
             elif type(v) in (int, float, decimal.Decimal):
                 format_value.append(str(v))
             elif issubclass(v.__class__, Enum):
-                format_value.append(str(v.value))
+                format_value.append(value_wrapper.format(str(v.value)))
             elif isinstance(v, datetime.datetime):
-                format_value.append(v.strftime('%Y-%m-%d %H:%M:%S'))
+                format_value.append(value_wrapper.format(v.strftime('%Y-%m-%d %H:%M:%S')))
             else:
-                format_value.append(str(v).replace("'", "''"))
+                format_value.append(value_wrapper.format(str(v).replace("'", "''")))
 
         self._condition.append(f"{column_name} in ({','.join(format_value)})")
 
