@@ -23,12 +23,12 @@ class QueryWrapper:
         if op.startswith('like'):
             value = str(value).replace("'", "''")
             if op == 'like':
-                value = f'%{value.replace("%", "[%]").replace("_", "[_]")}%'
+                value = '%{}%'.format(value.replace("%", r"\%").replace("_", r"\_"))
             elif op == 'like_left':
-                value = f'%{value.replace("%", "[%]").replace("_", "[_]")}'
+                value = '%{}'.format(value.replace("%", r"\%").replace("_", r"\_"))
                 op = 'like'
             elif op == 'like_right':
-                value = f'{value.replace("%", "[%]").replace("_", "[_]")}%'
+                value = '{}%'.format(value.replace("%", r"\%").replace("_", r"\_"))
                 op = 'like'
         return value, op
 
