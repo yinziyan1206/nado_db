@@ -38,6 +38,8 @@ class AsyncDriver:
 
     async def initial(self):
         self._pool = await self.create_pool(**self.config)
+        if not self._pool:
+            raise ConnectionError
 
     def acquire(self):
         return self._pool.acquire()
@@ -46,8 +48,7 @@ class AsyncDriver:
         return self._pool.release(conn)
 
     async def load_context(self):
-        conn = await self.acquire()
-        if not conn:
+        if not (conn := await self.acquire()):
             raise ConnectionError('connection established error')
 
         def release():
@@ -56,12 +57,14 @@ class AsyncDriver:
         conn.release = release
         return conn
 
-    def unload_context(self, conn):
+    async def unload_context(self, conn):
         if not conn.closed:
-            self.release(conn)
+            await self.release(conn)
 
     @property
     async def cursor(self):
+        instance = self
+
         class _Cursor:
             def __init__(self, connection, transaction, ignore_transactions):
                 self.connection = connection
@@ -82,7 +85,7 @@ class AsyncDriver:
                     await self.rollback()
                 else:
                     await self.commit()
-                self.connection.release()
+                await instance.unload_context(self.connection)
 
             async def commit(self):
                 if hasattr(self._transaction, 'commit') and not self.ignore_transactions:
