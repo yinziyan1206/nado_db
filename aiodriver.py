@@ -112,7 +112,7 @@ class AsyncDriver:
         if cursor:
             return await callback(cursor)
         else:
-            async with await self.cursor as cursor:
+            async with await self.cursor() as cursor:
                 return await callback(cursor)
 
     async def execute(self, sql: str, params=None, cursor=None) -> int:
