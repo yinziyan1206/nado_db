@@ -61,7 +61,6 @@ class AsyncDriver:
         if not conn.closed:
             await self.release(conn)
 
-    @property
     async def cursor(self):
         instance = self
 
@@ -124,7 +123,7 @@ class AsyncDriver:
             if cursor:
                 return await cursor.execute(sql)
             else:
-                async with await self.cursor as cursor:
+                async with await self.cursor() as cursor:
                     return await cursor.execute(sql)
         except Exception:
             self.logger.error(f'ERR: {sql}')
@@ -136,7 +135,7 @@ class AsyncDriver:
         if _test:
             return sql_params(sql, *params)
 
-        async with await self.cursor as cursor:
+        async with await self.cursor() as cursor:
             await self.execute(sql, params, cursor)
             rows = [x for x in await cursor.fetchall()]
             description = cursor.description
