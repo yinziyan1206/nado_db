@@ -106,7 +106,7 @@ class RepositoryFactory:
         elif len(args) == 1:
             return self.save(args[0], cursor=cursor, _test=_test)
         else:
-            return 0
+            raise ValueError
 
     def delete(self, obj, cursor=None, _test=False):
         if self.check(obj):
