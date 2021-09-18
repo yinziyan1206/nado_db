@@ -71,7 +71,7 @@ class AsyncDriver:
             params = []
         sql = sql_params(sql, *params)
         try:
-            return await self.__cursor_wrapper(cursor, lambda f: f.execute)
+            return await self.__cursor_wrapper(cursor, lambda f: f.execute(sql))
         except Exception:
             self.logger.error(f'ERR: {sql}')
             raise
