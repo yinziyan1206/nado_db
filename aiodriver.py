@@ -55,8 +55,16 @@ class AsyncDriver:
             return await callback(cursor)
         else:
             async with await self.instance() as db:
-                async with await db.cursor() as cursor:
-                    return await callback(cursor)
+                try:
+                    async with await db.cursor() as cursor:
+                        res = await callback(cursor)
+                        if not self.config['auto_commit']:
+                            await db.commit()
+                        return res
+                except Exception:
+                    if not self.config['auto_commit']:
+                        await db.rollback()
+                    raise
 
     async def execute(self, sql: str, params=None, cursor=None) -> int:
         if params is None:
@@ -210,6 +218,7 @@ try:
     class AioMySQL(AsyncDriver):
 
         def create_pool(self, **kwargs):
+            self.config['auto_commit'] = False
             config = {
                 'host': kwargs['host'],
                 'port': kwargs['port'],
@@ -237,7 +246,7 @@ try:
             dsn = "dbname={0} user={1} password={2} host={3} port={4}".format(
                 kwargs['database'], kwargs['user'], kwargs['password'], kwargs['host'], kwargs['port']
             )
-            self.config['ignore_transactions'] = True
+            self.config['auto_commit'] = True
             return aiopg.create_pool(dsn)
 
         def _process_insert_query(self, sql, seq_name, table_name):
