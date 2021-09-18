@@ -41,90 +41,29 @@ class AsyncDriver:
         if not self._pool:
             raise ConnectionError
 
-    def acquire(self):
+    def _acquire(self):
         return self._pool.acquire()
 
-    def release(self, conn):
+    def _release(self, conn):
         return self._pool.release(conn)
 
-    async def load_context(self):
-        if not (conn := await self.acquire()):
-            raise ConnectionError('connection established error')
-
-        def release():
-            self.unload_context(conn)
-
-        conn.release = release
-        return conn
-
-    async def unload_context(self, conn):
-        if not conn.closed:
-            await self.release(conn)
-
-    async def cursor(self):
-        instance = self
-
-        class _Cursor:
-            def __init__(self, connection, transaction, ignore_transactions):
-                self.connection = connection
-                self.cursor = connection.cursor()
-                self.transaction = transaction
-                self._transaction = None
-                self.ignore_transactions = ignore_transactions
-
-            async def __aenter__(self):
-                cursor = await self.cursor.__aenter__()
-                self._transaction = self.transaction(cursor)
-                await self.begin()
-                return cursor
-
-            async def __aexit__(self, exc_type, exc_val, exc_tb):
-                await self.cursor.__aexit__(exc_type, exc_val, exc_tb)
-                if exc_type is not None:
-                    await self.rollback()
-                else:
-                    await self.commit()
-                await instance.unload_context(self.connection)
-
-            async def commit(self):
-                if hasattr(self._transaction, 'commit') and not self.ignore_transactions:
-                    await self._transaction.commit()
-
-            async def rollback(self):
-                if hasattr(self._transaction, 'rollback') and not self.ignore_transactions:
-                    await self._transaction.rollback()
-
-            async def begin(self):
-                if hasattr(self._transaction, 'begin') and not self.ignore_transactions:
-                    await self._transaction.begin()
-
-        conn = await self.load_context()
-        return _Cursor(
-            conn,
-            transaction=lambda x: self.transaction(x),
-            ignore_transactions=self.config['ignore_transactions']
-        )
-
-    def transaction(self, cursor):
-        raise NotImplementedError()
+    def instance(self):
+        return self._acquire()
 
     async def __cursor_wrapper(self, cursor, callback):
         if cursor:
             return await callback(cursor)
         else:
-            async with await self.cursor() as cursor:
-                return await callback(cursor)
+            async with await self.instance() as db:
+                async with await db.cursor() as cursor:
+                    return await callback(cursor)
 
     async def execute(self, sql: str, params=None, cursor=None) -> int:
         if params is None:
             params = []
         sql = sql_params(sql, *params)
         try:
-            if cursor:
-                return await cursor.execute(sql)
-            else:
-                async with await self.cursor() as cursor:
-                    return await cursor.execute(sql)
+            return await self.__cursor_wrapper(cursor, lambda f: f.execute)
         except Exception:
             self.logger.error(f'ERR: {sql}')
             raise
@@ -135,10 +74,11 @@ class AsyncDriver:
         if _test:
             return sql_params(sql, *params)
 
-        async with await self.cursor() as cursor:
-            await self.execute(sql, params, cursor)
-            rows = [x for x in await cursor.fetchall()]
-            description = cursor.description
+        async with await self.instance() as db:
+            async with await db.cursor() as cursor:
+                await self.execute(sql, params, cursor)
+                rows = [x for x in await cursor.fetchall()]
+                description = cursor.description
 
         if description:
             json_row = []
@@ -227,6 +167,10 @@ class AsyncDriver:
     def column_format(v):
         return f'`{v}`'
 
+    def __del__(self):
+        if self._pool:
+            self._pool.close()
+
 
 class AsyncNoSQLDriver:
     def __init__(
@@ -272,17 +216,14 @@ try:
                 'user': kwargs['user'],
                 'password': kwargs['password'],
                 'db': kwargs['database'],
-                'charset': kwargs['charset']
+                'charset': kwargs['charset'],
+                'minsize': 5 if 'minsize' not in kwargs else kwargs['minsize'],
+                'maxsize': 20 if 'maxsize' not in kwargs else kwargs['maxsize'],
             }
             return aiomysql.create_pool(**config)
 
         def _process_insert_query(self, query, seq_name, table_name):
             return query, 'SELECT last_insert_id();'
-
-        def transaction(self, cursor):
-            if 'isolation_level' in self.config:
-                raise aiomysql.ProgrammingError('mysql cannot support isolation_level')
-            return cursor.connection
 
 except ImportError:
     aiomysql = AioMySQL = None
@@ -319,11 +260,6 @@ try:
         @staticmethod
         def column_format(v):
             return f'"{v}"'
-
-        def transaction(self, cursor):
-            if 'isolation_level' in self.config:
-                return aiopg.Transaction(cursor, aiopg.IsolationLevel[self.config['isolation_level']])
-            return aiopg.Transaction(cursor, aiopg.IsolationLevel.default)
 
 except ImportError:
     aiopg = AioPostgreSQL = None
