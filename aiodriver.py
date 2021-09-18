@@ -54,17 +54,19 @@ class AsyncDriver:
         if cursor:
             return await callback(cursor)
         else:
-            async with await self.instance() as db:
-                try:
-                    async with await db.cursor() as cursor:
+            try:
+                async with await self.instance() as conn:
+                    async with await conn.cursor() as cursor:
                         res = await callback(cursor)
                         if not self.config['auto_commit']:
-                            await db.commit()
+                            await conn.commit()
                         return res
-                except Exception:
-                    if not self.config['auto_commit']:
-                        await db.rollback()
-                    raise
+            except Exception:
+                if not self.config['auto_commit']:
+                    await conn.rollback()
+                raise
+            finally:
+                self._release(conn)
 
     async def execute(self, sql: str, params=None, cursor=None) -> int:
         if params is None:
