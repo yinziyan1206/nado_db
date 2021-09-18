@@ -41,14 +41,14 @@ class AsyncDriver:
         if not self._pool:
             raise ConnectionError
 
-    def _acquire(self):
+    def acquire(self):
         return self._pool.acquire()
 
-    def _release(self, conn):
+    def release(self, conn):
         return self._pool.release(conn)
 
     def instance(self):
-        return self._acquire()
+        return self.acquire()
 
     async def __cursor_wrapper(self, cursor, callback):
         if cursor:
@@ -66,7 +66,7 @@ class AsyncDriver:
                     await conn.rollback()
                 raise
             finally:
-                self._release(conn)
+                self.release(conn)
 
     async def execute(self, sql: str, params=None, cursor=None) -> int:
         if params is None:
@@ -89,6 +89,7 @@ class AsyncDriver:
                 await self.execute(sql, params, cursor)
                 rows = [x for x in await cursor.fetchall()]
                 description = cursor.description
+        self.release(db)
 
         if description:
             json_row = []
