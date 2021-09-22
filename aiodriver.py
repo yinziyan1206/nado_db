@@ -54,8 +54,8 @@ class AsyncDriver:
         if cursor:
             return await callback(cursor)
         else:
+            conn = await self.acquire()
             try:
-                conn = await self.acquire()
                 async with await conn.cursor() as cursor:
                     res = await callback(cursor)
                     if not self.config['auto_commit']:
@@ -88,6 +88,7 @@ class AsyncDriver:
         async with await conn.cursor() as cursor:
             await cursor.execute(sql_params(sql, params))
             rows = await cursor.fetchall()
+        await conn.commit()
         await self.release(conn)
         description = cursor.description
 
