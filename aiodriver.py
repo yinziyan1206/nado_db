@@ -41,11 +41,11 @@ class AsyncDriver:
         if not self._pool:
             raise ConnectionError
 
-    def acquire(self):
-        return self._pool.acquire()
+    async def acquire(self):
+        return await self._pool.acquire()
 
-    def release(self, conn):
-        return self._pool.release(conn)
+    async def release(self, conn):
+        await self._pool.release(conn)
 
     def instance(self):
         return self.acquire()
@@ -55,18 +55,18 @@ class AsyncDriver:
             return await callback(cursor)
         else:
             try:
-                async with await self.instance() as conn:
-                    async with await conn.cursor() as cursor:
-                        res = await callback(cursor)
-                        if not self.config['auto_commit']:
-                            await conn.commit()
-                        return res
+                conn = await self.acquire()
+                async with await conn.cursor() as cursor:
+                    res = await callback(cursor)
+                    if not self.config['auto_commit']:
+                        await conn.commit()
+                    return res
             except Exception:
                 if not self.config['auto_commit']:
                     await conn.rollback()
                 raise
             finally:
-                self.release(conn)
+                await self.release(conn)
 
     async def execute(self, sql: str, params=None, cursor=None) -> int:
         if params is None:
@@ -84,12 +84,12 @@ class AsyncDriver:
         if _test:
             return sql_params(sql, *params)
 
-        async with await self.instance() as db:
-            async with await db.cursor() as cursor:
-                await self.execute(sql, params, cursor)
-                rows = [x for x in await cursor.fetchall()]
-                description = cursor.description
-        self.release(db)
+        conn = await self.acquire()
+        async with await conn.cursor() as cursor:
+            await cursor.execute(sql_params(sql, params))
+            rows = await cursor.fetchall()
+        await self.release(conn)
+        description = cursor.description
 
         if description:
             json_row = []
