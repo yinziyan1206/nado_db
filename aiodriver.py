@@ -58,13 +58,14 @@ class AsyncDriver:
             try:
                 async with await conn.cursor() as cursor:
                     res = await callback(cursor)
-                    if not self.config['auto_commit']:
-                        await conn.commit()
-                    return res
             except Exception:
                 if not self.config['auto_commit']:
                     await conn.rollback()
                 raise
+            else:
+                if not self.config['auto_commit']:
+                    await conn.commit()
+                return res
             finally:
                 await self.release(conn)
 
@@ -88,7 +89,7 @@ class AsyncDriver:
         async with await conn.cursor() as cursor:
             await cursor.execute(sql_params(sql, params))
             rows = await cursor.fetchall()
-        await conn.commit()
+            await conn.commit()
         await self.release(conn)
         description = cursor.description
 
@@ -181,7 +182,7 @@ class AsyncDriver:
 
     def __del__(self):
         if self._pool:
-            self._pool.close()
+            self._pool.terminate()
 
 
 class AsyncNoSQLDriver:
