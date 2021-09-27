@@ -233,6 +233,7 @@ try:
                 'charset': kwargs['charset'],
                 'minsize': 5 if 'minsize' not in kwargs else kwargs['minsize'],
                 'maxsize': 20 if 'maxsize' not in kwargs else kwargs['maxsize'],
+                'echo': kwargs['echo'] if 'echo' in kwargs else False
             }
             return aiomysql.create_pool(**config)
 
