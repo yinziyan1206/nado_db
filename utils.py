@@ -32,8 +32,9 @@ class QueryWrapper:
                 op = 'like'
         return value, op
 
-    def _base_op(self, column_name, value, op) -> None:
+    def _base_op(self, column_name, value, op, alias="") -> None:
         value, op = self.like_filter(value, op)
+        column_name = f"{alias}.{column_name}" if alias else column_name
         if value is None:
             self._condition.append(f"{column_name} is NULL")
         elif type(value) in (int, float, decimal.Decimal):
@@ -60,36 +61,39 @@ class QueryWrapper:
             value = str(value).replace("'", "''")
             self._condition.append(f"{column_name} {op} '{value}'")
 
-    def eq(self, column_name, value) -> None:
-        self._base_op(column_name, value, '=')
+    def eq(self, column_name, value, alias="") -> None:
+        self._base_op(column_name, value, '=', alias=alias)
 
-    def ne(self, column_name, value) -> None:
-        self._base_op(column_name, value, '<>')
+    def ne(self, column_name, value, alias="") -> None:
+        self._base_op(column_name, value, '<>', alias=alias)
 
-    def lt(self, column_name, value) -> None:
-        self._base_op(column_name, value, '<')
+    def lt(self, column_name, value, alias="") -> None:
+        self._base_op(column_name, value, '<', alias=alias)
 
-    def le(self, column_name, value) -> None:
-        self._base_op(column_name, value, '<=')
+    def le(self, column_name, value, alias="") -> None:
+        self._base_op(column_name, value, '<=', alias=alias)
 
-    def gt(self, column_name, value) -> None:
-        self._base_op(column_name, value, '>')
+    def gt(self, column_name, value, alias="") -> None:
+        self._base_op(column_name, value, '>', alias=alias)
 
-    def ge(self, column_name, value) -> None:
-        self._base_op(column_name, value, '>=')
+    def ge(self, column_name, value, alias="") -> None:
+        self._base_op(column_name, value, '>=', alias=alias)
 
-    def like(self, column_name, value) -> None:
-        self._base_op(column_name, value, 'like')
+    def like(self, column_name, value, alias="") -> None:
+        self._base_op(column_name, value, 'like', alias=alias)
 
-    def like_left(self, column_name, value) -> None:
-        self._base_op(column_name, value, 'like_left')
+    def like_left(self, column_name, value, alias="") -> None:
+        self._base_op(column_name, value, 'like_left', alias=alias)
 
-    def like_right(self, column_name, value) -> None:
-        self._base_op(column_name, value, 'like_right')
+    def like_right(self, column_name, value, alias="") -> None:
+        self._base_op(column_name, value, 'like_right', alias=alias)
 
-    def include(self, column_name, *values) -> None:
+    def include(self, column_name, *values, alias="") -> None:
         format_value = []
         value_wrapper = "'{0}'"
+        if not values:
+            raise IndexError
+
         for v in values:
             if v is None:
                 format_value.append('NULL')
@@ -102,6 +106,7 @@ class QueryWrapper:
             else:
                 format_value.append(value_wrapper.format(str(v).replace("'", "''")))
 
+        column_name = f"{alias}.{column_name}" if alias else column_name
         self._condition.append(f"{column_name} in ({','.join(format_value)})")
 
     def last(self, sql) -> None:
