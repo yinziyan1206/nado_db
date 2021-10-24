@@ -216,6 +216,11 @@ class AsyncNoSQLDriver:
     def create_pool(self, **kwargs):
         raise NotImplementedError()
 
+    async def initial(self):
+        await self.create_pool(**self.config)
+        if not self._client:
+            raise ConnectionError
+
 
 try:
     import aiomysql
