@@ -19,10 +19,10 @@ class QueryWrapper:
         self._last: str = ""
 
     @staticmethod
-    def like_filter(value, op):
+    def _like_filter(value, op):
         if op.startswith('like'):
             value = str(value).replace("'", "''")
-            if op == 'like':
+            if op == 'like' or op == 'not like':
                 value = '%{}%'.format(value.replace("%", r"\%").replace("_", r"\_"))
             elif op == 'like_left':
                 value = '%{}'.format(value.replace("%", r"\%").replace("_", r"\_"))
@@ -32,16 +32,26 @@ class QueryWrapper:
                 op = 'like'
         return value, op
 
-    def _base_op(self, column_name, value, op, alias="") -> None:
-        value, op = self.like_filter(value, op)
+    @staticmethod
+    def _format_value(v) -> str:
+        value_wrapper = "'{0}'"
+
+        if v is None:
+            return 'NULL'
+        elif type(v) in (int, float, decimal.Decimal):
+            return str(v)
+        elif issubclass(v.__class__, Enum):
+            return value_wrapper.format(str(v.value))
+        elif isinstance(v, datetime.datetime):
+            return value_wrapper.format(v.strftime('%Y-%m-%d %H:%M:%S'))
+        else:
+            return value_wrapper.format(str(v).replace("'", "''").replace('\\', '\\\\'))
+
+    def _base_op(self, column_name, value, op, alias="") -> "QueryWrapper":
+        value, op = self._like_filter(value, op)
         column_name = f"{alias}.{column_name}" if alias else column_name
-        if value is None:
-            self._condition.append(f"{column_name} is NULL")
-        elif type(value) in (int, float, decimal.Decimal):
-            self._condition.append(f"{column_name} {op} {value}")
-        elif issubclass(value.__class__, Enum):
-            self._condition.append(f"{column_name} {op} {value._value_}")
-        elif isinstance(value, datetime.datetime):
+
+        if isinstance(value, datetime.datetime):
             value = value.strftime('%Y-%m-%d %H:%M:%S')
             if op in ('>', '>='):
                 self._condition.append(f"{column_name} {op} '{value}.000000'")
@@ -58,62 +68,90 @@ class QueryWrapper:
             else:
                 self._condition.append(f"{column_name} {op} '{value}'")
         else:
-            value = str(value).replace("'", "''")
+            value = self._format_value(value)
             self._condition.append(f"{column_name} {op} '{value}'")
+        return self
 
-    def eq(self, column_name, value, alias="") -> None:
-        self._base_op(column_name, value, '=', alias=alias)
+    def eq(self, column_name, value, alias="") -> "QueryWrapper":
+        return self._base_op(column_name, value, '=', alias=alias)
 
-    def ne(self, column_name, value, alias="") -> None:
-        self._base_op(column_name, value, '<>', alias=alias)
+    def ne(self, column_name, value, alias="") -> "QueryWrapper":
+        return self._base_op(column_name, value, '<>', alias=alias)
 
-    def lt(self, column_name, value, alias="") -> None:
-        self._base_op(column_name, value, '<', alias=alias)
+    def lt(self, column_name, value, alias="") -> "QueryWrapper":
+        return self._base_op(column_name, value, '<', alias=alias)
 
-    def le(self, column_name, value, alias="") -> None:
-        self._base_op(column_name, value, '<=', alias=alias)
+    def le(self, column_name, value, alias="") -> "QueryWrapper":
+        return self._base_op(column_name, value, '<=', alias=alias)
 
-    def gt(self, column_name, value, alias="") -> None:
-        self._base_op(column_name, value, '>', alias=alias)
+    def gt(self, column_name, value, alias="") -> "QueryWrapper":
+        return self._base_op(column_name, value, '>', alias=alias)
 
-    def ge(self, column_name, value, alias="") -> None:
-        self._base_op(column_name, value, '>=', alias=alias)
+    def ge(self, column_name, value, alias="") -> "QueryWrapper":
+        return self._base_op(column_name, value, '>=', alias=alias)
 
-    def like(self, column_name, value, alias="") -> None:
-        self._base_op(column_name, value, 'like', alias=alias)
+    def like(self, column_name, value, alias="") -> "QueryWrapper":
+        return self._base_op(column_name, value, 'like', alias=alias)
 
-    def like_left(self, column_name, value, alias="") -> None:
-        self._base_op(column_name, value, 'like_left', alias=alias)
+    def not_like(self, column_name, value, alias="") -> "QueryWrapper":
+        return self._base_op(column_name, value, 'not like', alias=alias)
 
-    def like_right(self, column_name, value, alias="") -> None:
-        self._base_op(column_name, value, 'like_right', alias=alias)
+    def like_left(self, column_name, value, alias="") -> "QueryWrapper":
+        return self._base_op(column_name, value, 'like_left', alias=alias)
 
-    def include(self, column_name, *values, alias="") -> None:
+    def like_right(self, column_name, value, alias="") -> "QueryWrapper":
+        return self._base_op(column_name, value, 'like_right', alias=alias)
+
+    def include(self, column_name, *values, alias="") -> "QueryWrapper":
         format_value = []
-        value_wrapper = "'{0}'"
         if not values:
             raise IndexError
 
         for v in values:
-            if v is None:
-                format_value.append('NULL')
-            elif type(v) in (int, float, decimal.Decimal):
-                format_value.append(str(v))
-            elif issubclass(v.__class__, Enum):
-                format_value.append(value_wrapper.format(str(v.value)))
-            elif isinstance(v, datetime.datetime):
-                format_value.append(value_wrapper.format(v.strftime('%Y-%m-%d %H:%M:%S')))
-            else:
-                format_value.append(value_wrapper.format(str(v).replace("'", "''")))
+            format_value.append(self._format_value(v))
 
         column_name = f"{alias}.{column_name}" if alias else column_name
         self._condition.append(f"{column_name} in ({','.join(format_value)})")
+        return self
+
+    def between(self, column_name, left, right, alias="") -> "QueryWrapper":
+        column_name = f"{alias}.{column_name}" if alias else column_name
+        self._condition.append(
+            f"{column_name} between ({self._format_value(left)} and {self._format_value(right)})"
+        )
+        return self
+
+    def not_between(self, column_name, left, right, alias="") -> "QueryWrapper":
+        column_name = f"{alias}.{column_name}" if alias else column_name
+        self._condition.append(
+            f"{column_name} not between ({self._format_value(left)} and {self._format_value(right)})"
+        )
+        return self
+
+    def exists(self, sub_sql) -> "QueryWrapper":
+        self._condition.append(f"exists ({sub_sql})")
+        return self
+
+    def not_exist(self, sub_sql) -> "QueryWrapper":
+        self._condition.append(f"not exists ({sub_sql})")
+        return self
 
     def last(self, sql) -> None:
         self._last = sql
 
+    def xor(self, query_wrapper: "QueryWrapper") -> "QueryWrapper":
+        upper_condition = ' and '.join(self._condition)
+        lower_condition = ' and '.join(query_wrapper._condition)
+        self._condition = [f'(({upper_condition}) or ({lower_condition}))']
+        return self
+
     def add_order(self, order, asc=True):
         self._order.append(f'{order} {"asc" if asc else "desc"}')
+
+    def clear(self):
+        self._condition = ['1=1']
+        self._order.clear()
+        self._last = ""
 
     @property
     def order(self) -> str:
@@ -124,3 +162,5 @@ class QueryWrapper:
     @property
     def sql_segment(self):
         return f"{' and '.join(self._condition)} {self.order} {self._last}"
+
+
