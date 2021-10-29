@@ -69,7 +69,8 @@ class QueryWrapper:
                 self._condition.append(f"{column_name} {op} '{value}'")
         else:
             value = self._format_value(value)
-            self._condition.append(f"{column_name} {op} '{value}'")
+            self._condition.append(f"{column_name} {op} {value}")
+
         return self
 
     def eq(self, column_name, value, alias="") -> "QueryWrapper":
@@ -162,5 +163,3 @@ class QueryWrapper:
     @property
     def sql_segment(self):
         return f"{' and '.join(self._condition)} {self.order} {self._last}"
-
-
