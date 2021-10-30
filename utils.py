@@ -3,6 +3,7 @@ __author__ = 'ziyan.yin'
 
 import datetime
 import decimal
+from copy import copy
 from enum import Enum
 
 
@@ -71,6 +72,10 @@ class QueryWrapper:
             value = self._format_value(value)
             self._condition.append(f"{column_name} {op} {value}")
 
+        return self
+
+    def add_raw_condition(self, condition) -> "QueryWrapper":
+        self._condition.append(f'({condition})')
         return self
 
     def eq(self, column_name, value, alias="") -> "QueryWrapper":
@@ -163,3 +168,35 @@ class QueryWrapper:
     @property
     def sql_segment(self):
         return f"{' and '.join(self._condition)} {self.order} {self._last}"
+
+
+class Page:
+    """
+        SQL Result Page
+        Needed: Primary Key[id], OFFSET, SIZE, QueryWrapper
+    """
+    __slots__ = ["offset", "size", "record", "total", "wrapper"]
+
+    def __init__(self, query_wrapper: QueryWrapper, offset: int = 0, size: int = 10):
+        self.offset: int = offset
+        self.size: int = size
+        self.total: int = 0
+        self.record: list = []
+        self.wrapper: QueryWrapper = copy(query_wrapper)
+        self._structure()
+
+    def next(self):
+        if self.total >= self.offset + self.size:
+            self.offset += self.size
+            self.record.clear()
+            self._structure()
+        return self
+
+    def prev(self):
+        self.offset = max(0, self.offset - self.size)
+        self.record.clear()
+        self._structure()
+        return self
+
+    def _structure(self):
+        self.wrapper.last(f"LIMIT {self.size} OFFSET {self.offset}")
