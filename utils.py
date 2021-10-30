@@ -200,3 +200,12 @@ class Page:
 
     def _structure(self):
         self.wrapper.last(f"LIMIT {self.size} OFFSET {self.offset}")
+
+    def to_data(self) -> dict:
+        return {
+            "data": self.record,
+            "offset": self.offset,
+            "size": self.size,
+            "total": self.total,
+            "has_more": self.offset + self.size < self.total
+        }
