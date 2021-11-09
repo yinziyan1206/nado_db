@@ -93,10 +93,10 @@ class RepositoryFactory:
             for x in args:
                 data = x.to_table()
                 items.append(data)
-                return await self.db.insert_many(
-                    table, cursor=cursor, _test=_test,
-                    rows=items
-                )
+            return await self.db.insert_many(
+                table, cursor=cursor, _test=_test,
+                rows=items
+            )
         else:
             return await self.save(args[0], cursor=cursor, _test=_test)
 
@@ -158,11 +158,11 @@ class RepositoryFactory:
             for x in args:
                 data = x.to_table()
                 items.append(data)
-                return await self.db.insert_many(
-                    table, cursor=cursor, _test=_test,
-                    _last=f"ON DUPLICATE KEY UPDATE {','.join(updates)}",
-                    rows=items
-                )
+            return await self.db.insert_many(
+                table, cursor=cursor, _test=_test,
+                _last=f"ON DUPLICATE KEY UPDATE {','.join(updates)}",
+                rows=items
+            )
         else:
             return await self.save(args[0], cursor=cursor, _test=_test)
 
