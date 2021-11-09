@@ -52,7 +52,9 @@ class QueryWrapper:
         value, op = self._like_filter(value, op)
         column_name = f"{alias}.{column_name}" if alias else column_name
 
-        if isinstance(value, datetime.datetime):
+        if value is None and op == '=':
+            self._condition.append(f"{column_name} is NULL")
+        elif isinstance(value, datetime.datetime):
             value = value.strftime('%Y-%m-%d %H:%M:%S')
             if op in ('>', '>='):
                 self._condition.append(f"{column_name} {op} '{value}.000000'")
