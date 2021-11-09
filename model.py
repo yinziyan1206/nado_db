@@ -4,6 +4,8 @@ import enum
 from dataclasses import dataclass, fields, field
 import datetime
 
+from .sequence import flake
+
 
 def data_field(*, default=None, required=False, description='', length=64, exists=True):
     return field(
@@ -30,7 +32,6 @@ class BaseModel:
                 setattr(self, k, v(data))
 
     def next_val(self):
-        from sequence import flake
         if not self.id:
             while (index := flake()) == 0:
                 continue
