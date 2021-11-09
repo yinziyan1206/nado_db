@@ -1,4 +1,3 @@
-#!/usr/bin/python3
 __author__ = 'ziyan.yin'
 
 import logging

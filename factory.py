@@ -1,10 +1,9 @@
-#!/usr/bin/python3
 __author__ = 'ziyan.yin'
 
 import copy
 import datetime
 import itertools
-from dataclasses import is_dataclass, fields, asdict
+from dataclasses import is_dataclass, fields
 
 from .model import BaseModel
 from .aiodriver import AsyncDriver
@@ -54,10 +53,10 @@ class RepositoryFactory:
         self.auto_increment = auto_increment
         self.db = driver
 
-    async def save(self, obj, cursor=None, _test=False) -> int:
+    async def save(self, obj: BaseModel, cursor=None, _test=False) -> int:
         self.check(obj)
-        table = obj.table
-        seq = obj.primary if hasattr(obj, 'primary') else 'id'
+        table = getattr(obj, 'table')
+        seq = getattr(obj, 'primary', 'id')
         params = obj.to_table()
         if getattr(obj, seq, None):
             updates = {x: params[x] for x in params.keys() if x != seq}
@@ -82,20 +81,17 @@ class RepositoryFactory:
                 **params
             )
 
-    async def create_batch(self, *args, cursor=None, _test=False) -> int:
+    async def create_batch(self, *args: BaseModel, cursor=None, _test=False) -> int:
         if len(args) < 1:
             raise BatchInsertError
 
         self.check(args[0])
-        table = args[0].table
-        seq = args[0].primary if hasattr(args[0], 'primary') else 'id'
+        table = getattr(args[0], 'table')
         items = []
 
         if len(args) > 1:
             for x in args:
                 data = x.to_table()
-                if seq in data and not data[seq]:
-                    del data[seq]
                 items.append(data)
                 return await self.db.insert_many(
                     table, cursor=cursor, _test=_test,
@@ -104,15 +100,15 @@ class RepositoryFactory:
         else:
             return await self.save(args[0], cursor=cursor, _test=_test)
 
-    async def update_batch(self, *args, cursor=None, _test=False) -> int:
+    async def update_batch(self, *args: BaseModel, cursor=None, _test=False) -> int:
         if len(args) < 1:
             raise BatchInsertError
 
         ids = []
 
         self.check(args[0])
-        table = args[0].table
-        seq = args[0].primary if hasattr(args[0], 'primary') else 'id'
+        table = getattr(args[0], 'table')
+        seq = getattr(args[0], 'primary', 'id')
         updates = {
             x.name: [] for x in fields(args[0]) if x.name != 'version' and x.name != seq and x.metadata['exists']
         }
@@ -145,13 +141,13 @@ class RepositoryFactory:
             return sql_params(sql, *params)
         return await self.db.execute(sql, params=params, cursor=cursor)
 
-    async def save_batch(self, *args, cursor=None, _test=False) -> int:
+    async def save_batch(self, *args: BaseModel, cursor=None, _test=False) -> int:
         if len(args) < 1:
             raise BatchInsertError
 
         self.check(args[0])
-        table = args[0].table
-        seq = args[0].primary if hasattr(args[0], 'primary') else 'id'
+        table = getattr(args[0], 'table')
+        seq = getattr(args[0], 'primary', 'id')
         updates = [
             f'{x.name}=values({x.name})'
             for x in fields(args[0]) if x.name != seq and x.metadata['exists']
@@ -161,8 +157,6 @@ class RepositoryFactory:
         if len(args) > 1:
             for x in args:
                 data = x.to_table()
-                if seq in data and not data[seq]:
-                    del data[seq]
                 items.append(data)
                 return await self.db.insert_many(
                     table, cursor=cursor, _test=_test,
@@ -172,30 +166,30 @@ class RepositoryFactory:
         else:
             return await self.save(args[0], cursor=cursor, _test=_test)
 
-    async def destroy(self, obj, cursor=None, _test=False):
+    async def destroy(self, obj: BaseModel, cursor=None, _test=False):
         self.check(obj)
-        table = obj.table
-        seq = obj.primary if hasattr(obj, 'primary') else 'id'
+        table = getattr(obj, 'table')
+        seq = getattr(obj, 'primary', 'id')
         if key := getattr(obj, seq, None):
             return await self.db.delete(
                 table, _test=_test, cursor=cursor, where=sql_params(f"{seq} = {{}}", key)
             )
         return 0
 
-    async def delete(self, obj, cursor=None, _test=False):
+    async def delete(self, obj: BaseModel, cursor=None, _test=False):
         self.check(obj)
-        table = obj.table
-        seq = obj.primary if hasattr(obj, 'primary') else 'id'
+        table = getattr(obj, 'table')
+        seq = getattr(obj, 'primary', 'id')
         if key := getattr(obj, seq, None):
             return await self.db.update(
                 table, where=sql_params(f"{seq} = {{}}", key), _test=_test, cursor=cursor, deleted=1
             )
         return 0
 
-    def get(self, obj, _test=False):
+    def get(self, obj: BaseModel, _test=False):
         self.check(obj)
-        table = obj.table
-        seq = obj.primary if hasattr(obj, 'primary') else 'id'
+        table = getattr(obj, 'table')
+        seq = getattr(obj, 'primary', 'id')
         params = [x['name'] for x in properties(obj)]
         if key := getattr(obj, seq, None):
             return self.db.query(

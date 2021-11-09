@@ -1,5 +1,5 @@
-#!/usr/bin/python3
 __author__ = 'ziyan.yin'
+__describe__ = 'sql utils'
 
 import datetime
 import decimal
@@ -9,7 +9,7 @@ from enum import Enum
 
 class QueryWrapper:
     """
-        SQL Wrapper to select obj or dict
+        Query Wrapper to select obj or dict
     """
 
     __slots__ = ['_condition', '_order', '_last']
