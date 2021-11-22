@@ -1,6 +1,5 @@
 __author__ = 'ziyan.yin'
 
-import collections
 import logging
 from urllib import parse
 
@@ -50,7 +49,7 @@ class AsyncDriver:
     def instance(self):
         return self.acquire()
 
-    async def __cursor_wrapper(self, cursor, callback):
+    async def begin(self, cursor, callback):
         if cursor:
             return await callback(cursor)
         else:
@@ -74,7 +73,7 @@ class AsyncDriver:
             params = []
         sql = sql_params(sql, *params)
         try:
-            return await self.__cursor_wrapper(cursor, lambda f: f.execute(sql))
+            return await self.begin(cursor, lambda f: f.execute(sql))
         except Exception:
             self.logger.error(f'ERR: {sql}')
             raise
@@ -89,7 +88,8 @@ class AsyncDriver:
         async with await conn.cursor() as cursor:
             await cursor.execute(sql_params(sql, params))
             rows = await cursor.fetchall()
-            await conn.commit()
+            if not self.config['auto_commit']:
+                await conn.commit()
         await self.release(conn)
         description = cursor.description
 
@@ -132,7 +132,7 @@ class AsyncDriver:
                     out = None
                 return out
 
-            return await self.__cursor_wrapper(cursor, _inner)
+            return await self.begin(cursor, _inner)
         else:
             return -1
 
@@ -279,6 +279,18 @@ try:
         @staticmethod
         def column_format(v):
             return f'"{v}"'
+
+        async def begin(self, cursor, callback):
+            if cursor:
+                return await callback(cursor)
+            else:
+                conn = await self.acquire()
+                try:
+                    async with await conn.cursor() as cursor:
+                        async with cursor.begin():
+                            return await callback(cursor)
+                finally:
+                    await self.release(conn)
 
 except ImportError:
     aiopg = AioPostgreSQL = None
