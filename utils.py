@@ -76,7 +76,7 @@ class QueryWrapper:
 
         return self
 
-    def add_raw_condition(self, condition) -> "QueryWrapper":
+    def apply(self, condition) -> "QueryWrapper":
         self._condition.append(f'({condition})')
         return self
 

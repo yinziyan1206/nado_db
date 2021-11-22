@@ -1,5 +1,6 @@
 __author__ = 'ziyan.yin'
 
+import collections
 import logging
 from urllib import parse
 
@@ -195,8 +196,6 @@ class AsyncNoSQLDriver:
             charset: str = 'utf8',
             **kwargs
     ):
-        self._pool = None
-        self._db = None
 
         self.config = {
             'host': host,
@@ -208,7 +207,7 @@ class AsyncNoSQLDriver:
             'max_size': kwargs['max_size'] if 'max_size' in kwargs else 10
         }
         self.config.update(kwargs)
-        self._client = None
+        self.pool = None
         self.database = None
         self.logger = logging.getLogger('aio-nosql-db')
 
@@ -217,7 +216,7 @@ class AsyncNoSQLDriver:
 
     async def initial(self):
         await self.create_pool(**self.config)
-        if not self._client:
+        if not self.database:
             raise ConnectionError
 
 
@@ -246,6 +245,7 @@ try:
 
 except ImportError:
     aiomysql = AioMySQL = None
+
 
 try:
     import aiopg
@@ -285,17 +285,18 @@ except ImportError:
 
 
 try:
-    import aiomongo
+    import motor
+    from motor import motor_asyncio
 
     class AioMongoDB(AsyncNoSQLDriver):
 
         async def create_pool(self, **keywords):
             auth = f"{parse.quote(keywords['user'])}:{parse.quote(keywords['password'])}@" \
                 if keywords['user'] and keywords['password'] else ''
-            uri = f"mongodb://{auth}{keywords['host']}:{keywords['port']}" \
-                  f"/{keywords['database']}?maxpoolsize={keywords['max_size']}"
-            self._client = await aiomongo.create_client(uri)
-            self.database = self._client.get_database(keywords['database'])
+            uri = f"mongodb://{auth}{keywords['host']}:{keywords['port']}/{keywords['database']}"
+            self.pool = motor_asyncio.AsyncIOMotorClient(uri, maxPoolSize=keywords['maxsize'])
+            self.database = self.pool[keywords['database']]
+
 
 except ImportError:
-    aiomongo = AioMongoDB = None
+    motor = AioMongoDB = None
